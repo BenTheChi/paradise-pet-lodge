@@ -1,4 +1,4 @@
-export default class Employee{
+class Employee{
     constructor(name, timeIn, timeOut){
         this.name = name;
         this.timeIn = timeIn;
@@ -12,7 +12,7 @@ export default class Employee{
 
     numToTime(num){
         //TODO
-        return 0
+        return ""
     }
 }
 

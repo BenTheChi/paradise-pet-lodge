@@ -23,6 +23,14 @@ const parseWalkList = (file) => {
     let time = lengthOfTime(file)
 
     function getTimeRequest(request){
+        request = request.toLowerCase()
+
+        if(!request){
+            return null
+        }
+
+        return request.match(/((1[0-2])|[1-9])?(pm|am)/g)
+
         //TODO, parse apart the request and return the specific time, general time, or null
         //If it's split between two assign it based on filename (file)
     }
@@ -100,7 +108,7 @@ const assignEntries = (employees, entries) => {
     let max = employees.length - 1
 
     function increaseCounter(){
-        if(counter++ > max){
+        if(counter++ >= max){
             counter = 0
         }
     }
@@ -108,46 +116,45 @@ const assignEntries = (employees, entries) => {
     entries.forEach((entry) => {
         let startCount = counter
         do {
-            if(employees[counter].AmTimeLeft <= 0 && employees[counter].PmTimeLeft <= 0){
+            let AmTimeLeft = employees[counter].AmTimeLeft
+            let PmTimeLeft = employees[counter].PmTimeLeft
+            if(AmTimeLeft <= 0 && PmTimeLeft <= 0){
                 increaseCounter()
                 continue
             }
-            else if(entry.timeRequest.toUpperCase().contains("AM")){
-                if(employees[counter].AmTimeLeft - entry.time > 0){
-                    employees[counter].entries.push(entry)
-                    employees[counter].AmTimeLeft -= entry.time
-
-                    increaseCounter()
-                    return
+            if(entry.timeRequest){
+                if(entry.timeRequest.includes("am")){
+                    if(AmTimeLeft - entry.time > 0){
+                        employees[counter].entries.push(entry)
+                        employees[counter].AmTimeLeft -= entry.time
+                        increaseCounter()
+                        return
+                    }
+                }
+                else if(entry.timeRequest.includes("pm")){
+                    if(PmTimeLeft - entry.time > 0){
+                        employees[counter].entries.push(entry)
+                        employees[counter].PmTimeLeft -= entry.time
+                        increaseCounter()
+                        return
+                    }
                 }
             }
-            else if(entry.timeRequest.toUpperCase().contains("PM")){
-                if(employees[counter].PmTimeLeft - entry.time > 0){
-                    employees[counter].entries.push(entry)
-                    employees[counter].PmTimeLeft -= entry.time
 
+            if(AmTimeLeft > PmTimeLeft){
+                if(AmTimeLeft - entry.time > 0){
+                    employees[counter].entries.push(entry)
+                    employees[counter].AmTimeLeft -= entry.time
                     increaseCounter()
                     return
                 }
             }
             else{
-                if(AmTimeLeft > PmTimeLeft){
-                    if(employees[counter].AmTimeLeft - entry.time > 0){
-                        employees[counter].entries.push(entry)
-                        employees[counter].AmTimeLeft -= entry.time
-
-                        increaseCounter()
-                        return
-                    }
-                }
-                else{
-                    if(employees[counter].PmTimeLeft - entry.time > 0){
-                        employees[counter].entries.push(entry)
-                        employees[counter].PmTimeLeft -= entry.time
-
-                        increaseCounter()
-                        return
-                    }
+                if(PmTimeLeft - entry.time > 0){
+                    employees[counter].entries.push(entry)
+                    employees[counter].PmTimeLeft -= entry.time
+                    increaseCounter()
+                    return
                 }
             }
 
@@ -159,17 +166,22 @@ const assignEntries = (employees, entries) => {
     })
 
     return employees
+    // console.log(employees)
 }
 
 const employees = []
-const allEntries = []
+let allEntries = []
 
 //Adding interface to do this later
-employees.push(new Employee(Ben, 9, 12))
-employees.push(new Employee(Sarah, 12.5, 14.5))
-employees.push(new Employee(John, 15, 18))
+employees.push(new Employee("Ben", 9, 12))
+employees.push(new Employee("Sarah", 12.5, 14.5))
+employees.push(new Employee("John", 15, 18))
 
 //TODO Add a loop here for each walkList in the schedules folder
-allEntries = [...allEntries, parseWalkList('schedules/morningewalk3.html')]
+allEntries = allEntries.concat(parseWalkList('schedules/morningewalk3.html'))
 
-console.log(assignEntries(employees, allEntries))
+console.log("Total Entries " + allEntries.length)
+assignEntries(employees, allEntries).forEach((employee) => {
+    console.log("NEW EMPLOYEE: " + employee.name)
+    console.log(employee.entries.length)
+})
