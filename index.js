@@ -25,6 +25,10 @@ const getBuilding = (run) => {
 
 const lengthOfTime = (filename) => {
     //TODO, figure out the length of time based on the filename/package type
+    if(filename.includes("play")){
+        return .5
+    }
+
     return .25
 }
 
@@ -89,7 +93,7 @@ const parseWalkList = (file) => {
                             totals.set(building,totals.get(building)+1)
                         }
                         else{
-                            totals.set(building,0)
+                            totals.set(building,1)
                         }
                     }
                     else{
@@ -125,6 +129,7 @@ const parseWalkList = (file) => {
         }
     })
 
+    console.log(totals)
     return {allEntries, buildings, totals};
 }
 
@@ -216,7 +221,6 @@ const assignEntries = (employees, entries) => {
             increaseCounter()
         } while (counter != startCount);
 
-        // console.log(employees)
         //This only applies once if none of the employees can take the shift
         unassignable.push(entry)
     })
@@ -260,6 +264,10 @@ const assignBuilding = (employees, walkInfo) => {
 
             //Using an insertion sort + splice to skip over the element swapping
             for(let i=0; i<sortedCombinations.length; i++){
+                // console.log(sortedCombinations[i] + combinations.get(sortedCombinations[i]))
+                // console.log("vs")
+                // console.log(keyBuildings + valueTotal)
+                // console.log("")
                 if(combinations.get(sortedCombinations[i]) <= valueTotal){
                     sortedCombinations.splice(i,0,keyBuildings)
                     return
@@ -280,7 +288,6 @@ const assignBuilding = (employees, walkInfo) => {
     let counter = 0;
     let max = combinations.length - 1;
     
-    //DO this with employees instead
     for(let i=0; i<employees.length; i++){
         employees[i].buildings = combinations[counter];
 
@@ -304,12 +311,12 @@ employees.push(new Employee("Sarah", 12.5, 14.5))
 employees.push(new Employee("John", 15, 18))
 
 //TODO Add a loop here for each walkList in the schedules folder
-let walkInfo = parseWalkList('schedules/morningewalk3.html')
+let walkInfo = parseWalkList('schedules/afternoonwalk3e.html')
 allEntries = allEntries.concat(walkInfo.allEntries)
 
-console.log("Total Entries " + allEntries.length)
+// console.log("Total Entries " + allEntries.length)
 let buildingInfo = assignBuilding(employees, walkInfo)
-console.log(buildingInfo)
+// console.log(buildingInfo)
 if(buildingInfo.unassignable.length > 0){
     buildingInfo.unassignable.forEach((building) => {
         console.log("Building " + building + " is unassignable")
@@ -317,12 +324,13 @@ if(buildingInfo.unassignable.length > 0){
 }
 else{
     employees = buildingInfo.employees;
+    console.log(allEntries)
     const entries = assignEntries(employees, allEntries)
     
     entries.employees.forEach((employee) => {
-        console.log("NEW EMPLOYEE: " + employee.name)
-        console.log(employee.entries.length)
-        console.log(employee.buildings)
+        // console.log("NEW EMPLOYEE: " + employee.name)
+        // console.log(employee.entries.length)
+        // console.log(employee.buildings)
         // console.log(employee.entries)
     })
 }
