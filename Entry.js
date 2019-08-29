@@ -8,8 +8,8 @@ class Entry{
         this.request = request;
         this.out = out;
         this.checkedIn = checkedIn;
-        this.timeRequest = timeRequest
-        this.time = time
+        this.timeRequest = timeRequest;
+        this.time = time;
     }
 }
 

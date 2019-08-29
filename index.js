@@ -9,6 +9,20 @@ const Employee = require('./Employee').Employee;
 //     console.log($(el).text())
 // })
 
+const getBuilding = (run) => {
+    if(!run){
+        console.log("THERE IS A NULL RUN!")
+        return null
+    }
+
+    let building = run.charAt(0)
+    if(building === "S"){
+        return "D"
+    }
+
+    return building
+}
+
 const lengthOfTime = (filename) => {
     //TODO, figure out the length of time based on the filename/package type
     return .25
@@ -16,11 +30,14 @@ const lengthOfTime = (filename) => {
 
 const parseWalkList = (file) => {
     const allEntries = []
+    const buildings = new Set()
+    const totals = new Map()
     let run, name, sex, age, breed, request, out, timeRequest = null;
     let checkedIn = true;
     let targetCount = 0;
     let htmlData = fs.readFileSync(file, 'utf-8')
     let time = lengthOfTime(file)
+    
 
     function getTimeRequest(request){
         request = request.toLowerCase()
@@ -31,7 +48,7 @@ const parseWalkList = (file) => {
 
         return request.match(/((1[0-2])|[1-9])?(pm|am)/g)
 
-        //TODO, parse apart the request and return the specific time, general time, or null
+        //TODO
         //If it's split between two assign it based on filename (file)
     }
 
@@ -61,10 +78,19 @@ const parseWalkList = (file) => {
                 case 0:
                     breed = value;
                     targetCount++;
-                    break;
+                break;
                 case 1:
                     if(value.match(/\w{1,2} \d{1,2}/)){
+                        let building = getBuilding(value)
                         run = value;
+                        buildings.add(building)
+
+                        if(totals.has(building)){
+                            totals.set(building,totals.get(building)+1)
+                        }
+                        else{
+                            totals.set(building,0)
+                        }
                     }
                     else{
                         name = value;
@@ -99,7 +125,7 @@ const parseWalkList = (file) => {
         }
     })
 
-    return allEntries;
+    return {allEntries, buildings, totals};
 }
 
 const assignEntries = (employees, entries) => {
@@ -108,7 +134,8 @@ const assignEntries = (employees, entries) => {
     let max = employees.length - 1
 
     function increaseCounter(){
-        if(counter++ >= max){
+        counter++
+        if(counter > max){
             counter = 0
         }
     }
@@ -118,14 +145,27 @@ const assignEntries = (employees, entries) => {
         do {
             let AmTimeLeft = employees[counter].AmTimeLeft
             let PmTimeLeft = employees[counter].PmTimeLeft
+            const building = getBuilding(entry.run)
+
             if(AmTimeLeft <= 0 && PmTimeLeft <= 0){
                 increaseCounter()
                 continue
+            }
+            if(!employees[counter].buildings.has(building)){
+                if(employees[counter].buildings.size === 2){
+                    increaseCounter()
+                    continue
+                }
             }
             if(entry.timeRequest){
                 if(entry.timeRequest.includes("am")){
                     if(AmTimeLeft - entry.time > 0){
                         employees[counter].entries.push(entry)
+
+                        if(building != "O"){
+                            employees[counter].buildings.add(building)
+                        }
+
                         employees[counter].AmTimeLeft -= entry.time
                         increaseCounter()
                         return
@@ -134,6 +174,11 @@ const assignEntries = (employees, entries) => {
                 else if(entry.timeRequest.includes("pm")){
                     if(PmTimeLeft - entry.time > 0){
                         employees[counter].entries.push(entry)
+
+                        if(building != "O"){
+                            employees[counter].buildings.add(building)
+                        }
+
                         employees[counter].PmTimeLeft -= entry.time
                         increaseCounter()
                         return
@@ -144,6 +189,11 @@ const assignEntries = (employees, entries) => {
             if(AmTimeLeft > PmTimeLeft){
                 if(AmTimeLeft - entry.time > 0){
                     employees[counter].entries.push(entry)
+
+                    if(building != "O"){
+                        employees[counter].buildings.add(building)
+                    }
+
                     employees[counter].AmTimeLeft -= entry.time
                     increaseCounter()
                     return
@@ -152,6 +202,11 @@ const assignEntries = (employees, entries) => {
             else{
                 if(PmTimeLeft - entry.time > 0){
                     employees[counter].entries.push(entry)
+
+                    if(building != "O"){
+                        employees[counter].buildings.add(building)
+                    }
+
                     employees[counter].PmTimeLeft -= entry.time
                     increaseCounter()
                     return
@@ -160,16 +215,87 @@ const assignEntries = (employees, entries) => {
 
             increaseCounter()
         } while (counter != startCount);
-        
+
+        // console.log(employees)
         //This only applies once if none of the employees can take the shift
         unassignable.push(entry)
     })
 
-    return employees
-    // console.log(employees)
+    return {employees, unassignable}
 }
 
-const employees = []
+const assignBuilding = (employees, walkInfo) => {
+    const availableBuildings = Array.from(walkInfo.buildings);
+    const buildingTotals = walkInfo.totals;
+    let unassignable = [];
+    
+    function findCombinations(){
+        const combinations = new Map();
+        let count = 0;
+
+        //Don't use the last building (size-1) as it's already been accounted for in previous combinations
+        while(count < availableBuildings.length-1){
+            for(let i=count+1; i<availableBuildings.length; i++){
+                const build1 = availableBuildings[count]
+                const build2 = availableBuildings[i]
+                const sum = buildingTotals.get(build1) + buildingTotals.get(build2)
+                
+                //Key = 2 building String ex-"AB".  Value = The total number of entries for both.
+                combinations.set(build1+build2, sum)
+            }
+
+            count++
+        }
+
+        //Take the combinations Map and use insertion sort to put it in the array
+        let sortedCombinations = [];
+        
+        //Converts the String building combination into a set
+        //Then sorts it into an array based on total entries for that combination
+        combinations.forEach((valueTotal, keyBuildings) => {            
+            if(sortedCombinations.length === 0){
+                sortedCombinations.push(keyBuildings)
+                return
+            }
+
+            //Using an insertion sort + splice to skip over the element swapping
+            for(let i=0; i<sortedCombinations.length; i++){
+                if(combinations.get(sortedCombinations[i]) <= valueTotal){
+                    sortedCombinations.splice(i,0,keyBuildings)
+                    return
+                }
+            }
+
+            sortedCombinations.push(keyBuildings)
+        })
+
+        for(let i=0; i<sortedCombinations.length; i++){
+            sortedCombinations[i] = new Set(sortedCombinations[i].split(""))
+        }
+
+        return sortedCombinations
+    }
+    
+    let combinations = findCombinations()
+    let counter = 0;
+    let max = combinations.length - 1;
+    
+    //DO this with employees instead
+    for(let i=0; i<employees.length; i++){
+        employees[i].buildings = combinations[counter];
+
+        counter++
+        if(counter > max){
+            counter = 0;
+        }
+    }
+
+    //FIX UNASSIGNABLE
+    unassignable
+    return {employees, unassignable}
+}
+
+let employees = []
 let allEntries = []
 
 //Adding interface to do this later
@@ -178,10 +304,25 @@ employees.push(new Employee("Sarah", 12.5, 14.5))
 employees.push(new Employee("John", 15, 18))
 
 //TODO Add a loop here for each walkList in the schedules folder
-allEntries = allEntries.concat(parseWalkList('schedules/morningewalk3.html'))
+let walkInfo = parseWalkList('schedules/morningewalk3.html')
+allEntries = allEntries.concat(walkInfo.allEntries)
 
 console.log("Total Entries " + allEntries.length)
-assignEntries(employees, allEntries).forEach((employee) => {
-    console.log("NEW EMPLOYEE: " + employee.name)
-    console.log(employee.entries.length)
-})
+let buildingInfo = assignBuilding(employees, walkInfo)
+console.log(buildingInfo)
+if(buildingInfo.unassignable.length > 0){
+    buildingInfo.unassignable.forEach((building) => {
+        console.log("Building " + building + " is unassignable")
+    })
+}
+else{
+    employees = buildingInfo.employees;
+    const entries = assignEntries(employees, allEntries)
+    
+    entries.employees.forEach((employee) => {
+        console.log("NEW EMPLOYEE: " + employee.name)
+        console.log(employee.entries.length)
+        console.log(employee.buildings)
+        // console.log(employee.entries)
+    })
+}
