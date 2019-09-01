@@ -77,6 +77,15 @@ class Row {
     }
 }
 
+class Employee {
+    constructor(name, timeIn, timeOut){
+        this.name = name
+        this.timeIn = timeIn
+        this.timeOut = timeOut
+        this.rows = []
+    }
+}
+
 const allRows = []
 
 let run, name, sex, age, breed, request, out = null;
