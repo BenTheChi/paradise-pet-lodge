@@ -4,12 +4,14 @@
   "description": "Tool for parsing and tracking pet lodge data",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js"
   },
   "author": "Ben Chi",
   "license": "ISC",
   "dependencies": {
     "cheerio": "^1.0.0-rc.3",
-    "googleapis": "^39.2.0"
+    "googleapis": "^39.2.0",
+    "inquirer": "^7.0.0",
+    "inquirer-recursive": "0.0.6"
   }
 }
