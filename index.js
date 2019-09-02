@@ -1,4 +1,5 @@
 "use strict"
+const path = require('path')
 const cheerio = require('cheerio')
 const fs = require('fs')
 const Entry = require('./Entry').Entry;
@@ -23,6 +24,21 @@ const getBuilding = (run) => {
     return building
 }
 
+const mergeTotals = (original,incoming) => {
+    incoming.forEach((building) => {
+        let value = incoming.get(building)
+
+        if(original.has(building)){
+            original.set(building, original.get(building) + value)
+        }
+        else{
+            original.set(building, value)
+        }
+    })
+
+    return original
+}
+
 const parseWalkList = (file) => {
     const allEntries = []
     const buildings = new Set()
@@ -41,9 +57,6 @@ const parseWalkList = (file) => {
         }
 
         return request.match(/((1[0-2])|[1-9])?(pm|am)/g)
-
-        //TODO
-        //If it's split between two assign it based on filename (file)
     }
 
     //Pre parse the document to find the title
@@ -60,9 +73,12 @@ const parseWalkList = (file) => {
             let special = null
             let pkgPlay = null
 
-            console.log(fileName)
-
             switch(fileName){
+                case "Morning Walk to CS 7AM $8 Schedule":
+                    target = /(fc3)|(fc10)/g
+                    out = /(fc8)/g
+                    special = /(fc6)/g
+                    break;
                 case "Morning Walk to CS 8AM $8 Schedule":
                     target = /(fc3)/g
                     out = /(fc8)/g
@@ -74,10 +90,11 @@ const parseWalkList = (file) => {
                     special = /(fc6)/g
                     break;
                 case "Morning Morning Walk $8 Schedule":
-                    target = /(fc3)/g
-                    out = /(fc8)/g
-                    special = /(fc6)/g
+                    target = /(fc3)|(fc12)/g
+                    out = /(fc8)|(fc7)/g
+                    special = /(fc6)|(fc14)/g
                     break;
+                case "Morning Morning W/S $8 Schedule": 
                 case "Morning Morning W/S  $8 Schedule":
                     target = /(fc3)/g
                     out = /(fc8)/g
@@ -94,9 +111,9 @@ const parseWalkList = (file) => {
                     special = /(fc6)/g
                     break;
                 case "Evening Afternoon Walk - $8 Schedule":
-                    target = /(fc3)/g
-                    out = /(fc8)/g
-                    special = /(fc6)/g
+                    target = /(fc3)|(fc11)/g
+                    out = /(fc8)|(fc15)/g
+                    special = /(fc6)|(fc14)/g
                     break;
                 case "Afternoon Pack Walk/Snug $8 Schedule":
                     target = /(fc3)/g
@@ -123,8 +140,16 @@ const parseWalkList = (file) => {
                     out = /(fc8)/g
                     special = /(fc6)/g
                     break;
-                case "Morning Pkg Play $12 Schedule" || "Afternoon Pkg Play $12 Schedule" || "Evening Pkg Play $12 Schedule":
-                    target = /(fc3)/g
+                case "Morning Pkg Play $12 Schedule":
+                    target = /(fc3)|(fc11)/g
+                    out = /(fc8)/g
+                    special = /(fc6)/g
+                    pkgPlay = /(fc0)/g
+                    time = .5
+                    break;
+                case "Evening Pkg Play $12 Schedule":
+                case "Afternoon Pkg Play $12 Schedule":
+                    target = /(fc3)|(fc10)|(fc15)/g
                     out = /(fc8)/g
                     special = /(fc6)/g
                     pkgPlay = /(fc0)/g
@@ -188,6 +213,11 @@ const parseWalkList = (file) => {
                 allEntries.push(entry)
             }
 
+            //Setting these to null so I don't make a repeat of the last entry
+            timeRequest = null
+            run = null
+            name = null
+
             return false
         }
         
@@ -243,6 +273,20 @@ const parseWalkList = (file) => {
         }
     })
 
+    if(run && name){
+        if(timeRequest){
+            timeRequest.forEach((timeRequestEntry) => {
+                const entry = new Entry(run, name, sex, age, breed, request, out, special, timeRequestEntry, time)
+                allEntries.push(entry)
+            })
+        }
+
+        else{
+            const entry = new Entry(run, name, sex, age, breed, request, out, special, timeRequest, time)
+            allEntries.push(entry)
+        }
+    }
+
     return {allEntries, buildings, totals};
 }
 
@@ -265,6 +309,11 @@ const assignEntries = (employees, entries) => {
             let AmTimeLeft = employees[counter].AmTimeLeft
             let PmTimeLeft = employees[counter].PmTimeLeft
             const building = getBuilding(entry.run)
+
+            if(!building){
+                unassignable.push(entry)
+                return
+            }
 
             if(AmTimeLeft <= 0 && PmTimeLeft <= 0){
                 increaseCounter()
@@ -342,9 +391,8 @@ const assignEntries = (employees, entries) => {
     return {employees, unassignable}
 }
 
-const assignBuilding = (employees, walkInfo) => {
-    const availableBuildings = Array.from(walkInfo.buildings);
-    const buildingTotals = walkInfo.totals;
+const assignBuilding = (employees, buildings, buildingTotals) => {
+    const availableBuildings = Array.from(buildings);
     let unassignable = [];
     
     function findCombinations(){
@@ -412,44 +460,67 @@ const assignBuilding = (employees, walkInfo) => {
     }
 
     //FIX UNASSIGNABLE
-    unassignable
     return {employees, unassignable}
 }
 
 let employees = []
 let allEntries = []
+let buildings = new Set()
+let totals = new Map()
+
 
 //Adding interface to do this later
-employees.push(new Employee("Ben", 9, 12))
-employees.push(new Employee("Sarah", 12.5, 14.5))
-employees.push(new Employee("John", 15, 18))
+employees.push(new Employee("Ben", 8, 15))
+employees.push(new Employee("Sarah", 8, 15))
+employees.push(new Employee("John", 8, 15))
+employees.push(new Employee("Beverly", 8, 15))
+employees.push(new Employee("Adam", 8, 15))
 
-//TODO Add a loop here for each walkList in the schedules folder
-let walkInfo = parseWalkList('schedules/pkgplay3.html')
-allEntries = allEntries.concat(walkInfo.allEntries)
+//Loop through each HTML schedule and parse it into allEntries
+const directoryPath = path.join(__dirname,'schedules')
 
-// console.log("Total Entries " + allEntries.length)
-let buildingInfo = assignBuilding(employees, walkInfo)
-// console.log(buildingInfo)
-if(buildingInfo.unassignable.length > 0){
-    buildingInfo.unassignable.forEach((building) => {
-        console.log("Building " + building + " is unassignable")
+fs.readdir(directoryPath, (err, files) => {
+    if(err){
+        return console.log('Unable to scan directory: ' + err);
+    }
+
+    files.forEach((file) => {
+        let walkInfo = parseWalkList('schedules/' + file)
+
+        console.log(file)
+        console.log(walkInfo.allEntries.length)
+
+        allEntries = allEntries.concat(walkInfo.allEntries)
+        buildings = new Set([...buildings, ...walkInfo.buildings])
+        totals = mergeTotals(totals, walkInfo.totals)
     })
-}
-else{
-    employees = buildingInfo.employees;
-    // console.log(allEntries)
-    const entries = assignEntries(employees, allEntries)
+    console.log(allEntries.length)
     
-    entries.employees.forEach((employee) => {
-        console.log("NEW EMPLOYEE: " + employee.name)
-        console.log(employee.entries.length)
-        console.log(employee.buildings)
-        // console.log(employee.entries)
-    })
+    // console.log("Total Entries " + allEntries.length)
+    let buildingInfo = assignBuilding(employees, buildings, totals)
+    // console.log(buildingInfo)
+    if(buildingInfo.unassignable.length > 0){
+        buildingInfo.unassignable.forEach((building) => {
+            console.log("Building " + building + " is unassignable")
+        })
+    }
+    else{
+        employees = buildingInfo.employees;
+        // console.log(allEntries)
+        const entries = assignEntries(employees, allEntries)
+        
+        entries.employees.forEach((employee) => {
+            console.log("NEW EMPLOYEE: " + employee.name)
+            console.log(employee.entries.length)
+            console.log(employee.buildings)
+            // console.log(employee.entries)
+        })
 
-    entries.unassignable.forEach((entry) => {
-        console.log("\nUNASSIGNABLE: ")
-        console.log(entry)
-    })
-}
+        console.log("\nUNASSIGNABLE " + entries.unassignable.length)
+        // entries.unassignable.forEach((entry) => {
+        //     console.log("\nUNASSIGNABLE: ")
+        //     console.log(entry)
+        // })
+    }
+
+})
