@@ -1,5 +1,5 @@
 class Entry{
-    constructor(run, name, sex, age, breed, request, out, checkedIn, timeRequest, time){
+    constructor(run, name, sex, age, breed, request, out, special, timeRequest, time){
         this.run = run;
         this.name = name;
         this.sex = sex;
@@ -7,9 +7,15 @@ class Entry{
         this.breed = breed;
         this.request = request;
         this.out = out;
-        this.checkedIn = checkedIn;
         this.timeRequest = timeRequest;
         this.time = time;
+
+        if(!special || special === "Request:"){
+            this.special = null;
+        }
+        else{
+            this.special = special;
+        }
     }
 }
 

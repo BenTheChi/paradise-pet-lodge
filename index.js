@@ -1,18 +1,12 @@
 "use strict"
-const path = require('path')
 const cheerio = require('cheerio')
 const fs = require('fs')
 const Entry = require('./Entry').Entry;
-const Employee = require('./Employee').Employee;
-
-//Use to extract date
-// $('td.fc3').each((i, el) => {
-//     console.log($(el).text())
-// })
+const chalk = require('chalk');
 
 const getBuilding = (run) => {
     if(!run){
-        console.log("THERE IS A NULL RUN!")
+        console.log(chalk.red("THERE IS AN EMPTY RUN!\n"))
         return null
     }
 
@@ -24,7 +18,9 @@ const getBuilding = (run) => {
     return building
 }
 
-const mergeTotals = (original,incoming) => {
+module.exports = {
+
+mergeTotals: (original,incoming) => {
     incoming.forEach((building) => {
         let value = incoming.get(building)
 
@@ -37,9 +33,9 @@ const mergeTotals = (original,incoming) => {
     })
 
     return original
-}
+},
 
-const parseWalkList = (file) => {
+parseWalkList: (file) => {
     const allEntries = []
     const buildings = new Set()
     const totals = new Map()
@@ -91,7 +87,7 @@ const parseWalkList = (file) => {
                     break;
                 case "Morning Morning Walk $8 Schedule":
                     target = /(fc3)|(fc12)/g
-                    out = /(fc8)|(fc7)/g
+                    out = /(fc7)/g
                     special = /(fc6)|(fc14)/g
                     break;
                 case "Morning Morning W/S $8 Schedule": 
@@ -288,9 +284,9 @@ const parseWalkList = (file) => {
     }
 
     return {allEntries, buildings, totals};
-}
+},
 
-const assignEntries = (employees, entries) => {
+assignEntries: (employees, entries) => {
     const unassignable = []
     let counter = 0
     let max = employees.length - 1
@@ -302,14 +298,12 @@ const assignEntries = (employees, entries) => {
         }
     }
 
-    entries.forEach((entry) => {
+    entries.forEach((entry) => {        
         let startCount = counter
         do {
-
             let AmTimeLeft = employees[counter].AmTimeLeft
             let PmTimeLeft = employees[counter].PmTimeLeft
             const building = getBuilding(entry.run)
-
             if(!building){
                 unassignable.push(entry)
                 return
@@ -340,6 +334,7 @@ const assignEntries = (employees, entries) => {
                     }
                 }
                 else if(entry.timeRequest.includes("pm")){
+
                     if(PmTimeLeft - entry.time >= 0){
                         employees[counter].entries.push(entry)
 
@@ -354,7 +349,7 @@ const assignEntries = (employees, entries) => {
                 }
             }
 
-            if(AmTimeLeft > PmTimeLeft){
+            else if(AmTimeLeft > PmTimeLeft){
                 if(AmTimeLeft - entry.time > 0){
                     employees[counter].entries.push(entry)
 
@@ -389,9 +384,9 @@ const assignEntries = (employees, entries) => {
     })
 
     return {employees, unassignable}
-}
+},
 
-const assignBuilding = (employees, buildings, buildingTotals) => {
+assignBuilding: (employees, buildings, buildingTotals) => {
     const availableBuildings = Array.from(buildings);
     let unassignable = [];
     
@@ -461,66 +456,40 @@ const assignBuilding = (employees, buildings, buildingTotals) => {
 
     //FIX UNASSIGNABLE
     return {employees, unassignable}
+},
+
+printResults: (entries) => {
+    console.log(chalk.black.bgGreen("!!!!!!!!!!!!!!!!!!!---------TODAY'S SCHEDULE---------!!!!!!!!!!!!!!!!!!!\n"))
+    console.log("\t\tNumber of unassignable entries: " + chalk.red(entries.unassignable.length) + "\n")
+
+    entries.employees.forEach((employee) => {
+        let buildingAssignments = ""
+
+        employee.buildings.forEach((building) => {
+            buildingAssignments += building + " "
+        })
+        console.log(chalk.magenta("\n------------------------------------------------------------------"))
+        console.log("\t\t" + chalk.black.bgCyan(employee.name.toUpperCase()) + " (" + buildingAssignments.trim() + ")")
+        console.log("\t\tIN: " + chalk.green(employee.formattedTimeIn()))
+        console.log("\t\tOUT: " + chalk.green(employee.formattedTimeOut()))
+        console.log("\t\ttotal entries: " + chalk.green(employee.entries.length) + "\n")
+        employee.entries.forEach((entry) => {
+            console.log(chalk.blue("RUN:") + entry.run + chalk.blue("  NAME:") + entry.name + chalk.blue("  SEX:") + entry.sex + chalk.blue("  AGE:") + entry.age + chalk.blue("  BREED:") + entry.breed)
+            if(entry.timeRequest){
+                console.log(chalk.blue("TIME REQUEST:") + entry.timeRequest)
+            }
+            if(entry.request){
+                console.log(chalk.blue("REQUEST:") + entry.request)
+            }
+            if(entry.out){
+                console.log(chalk.blue("OUT:") + entry.out)
+            }
+            if(entry.special){
+                console.log(chalk.blue("SPECIAL:") + entry.special)
+            }
+            console.log("")
+        })
+    })
 }
 
-let employees = []
-let allEntries = []
-let buildings = new Set()
-let totals = new Map()
-
-
-//Adding interface to do this later
-employees.push(new Employee("Ben", 8, 15))
-employees.push(new Employee("Sarah", 8, 15))
-employees.push(new Employee("John", 8, 15))
-employees.push(new Employee("Beverly", 8, 15))
-employees.push(new Employee("Adam", 8, 15))
-
-//Loop through each HTML schedule and parse it into allEntries
-const directoryPath = path.join(__dirname,'schedules')
-
-fs.readdir(directoryPath, (err, files) => {
-    if(err){
-        return console.log('Unable to scan directory: ' + err);
-    }
-
-    files.forEach((file) => {
-        let walkInfo = parseWalkList('schedules/' + file)
-
-        console.log(file)
-        console.log(walkInfo.allEntries.length)
-
-        allEntries = allEntries.concat(walkInfo.allEntries)
-        buildings = new Set([...buildings, ...walkInfo.buildings])
-        totals = mergeTotals(totals, walkInfo.totals)
-    })
-    console.log(allEntries.length)
-    
-    // console.log("Total Entries " + allEntries.length)
-    let buildingInfo = assignBuilding(employees, buildings, totals)
-    // console.log(buildingInfo)
-    if(buildingInfo.unassignable.length > 0){
-        buildingInfo.unassignable.forEach((building) => {
-            console.log("Building " + building + " is unassignable")
-        })
-    }
-    else{
-        employees = buildingInfo.employees;
-        // console.log(allEntries)
-        const entries = assignEntries(employees, allEntries)
-        
-        entries.employees.forEach((employee) => {
-            console.log("NEW EMPLOYEE: " + employee.name)
-            console.log(employee.entries.length)
-            console.log(employee.buildings)
-            // console.log(employee.entries)
-        })
-
-        console.log("\nUNASSIGNABLE " + entries.unassignable.length)
-        // entries.unassignable.forEach((entry) => {
-        //     console.log("\nUNASSIGNABLE: ")
-        //     console.log(entry)
-        // })
-    }
-
-})
+}
