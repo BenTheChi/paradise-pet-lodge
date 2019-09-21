@@ -1,10 +1,15 @@
 "use strict"
-const cheerio = require('cheerio')
-const fs = require('fs')
+const cheerio = require('cheerio');
+const fs = require('fs');
 const Entry = require('./Entry').Entry;
-const chalk = require('chalk');
+const Employee = require('./Employee').Employee;
 
-const getBuilding = (run) => {
+const chalk = require('chalk');
+const csv = require('csv-parser');
+
+parseEmployeeList('employees/Export_Schedule_Print.csv')
+
+function getBuilding(run) {
     if(!run){
         console.log(chalk.red("THERE IS AN EMPTY RUN!\n"))
         return null
@@ -18,9 +23,7 @@ const getBuilding = (run) => {
     return building
 }
 
-module.exports = {
-
-mergeTotals: (original,incoming) => {
+function mergeTotals(original,incoming){
     incoming.forEach((building) => {
         let value = incoming.get(building)
 
@@ -33,9 +36,62 @@ mergeTotals: (original,incoming) => {
     })
 
     return original
-},
+}
 
-parseWalkList: (file) => {
+function parseEmployeeList(file){
+    const results = [];
+    let employeeData = fs.readFileSync(file, 'utf-8');
+    let employeeName = "";
+    let employeeTimeIn = 0;
+    let employeeTimeOut = 0;
+    let employees = [];
+
+    function timeToNum(timeString){
+        const timeArray = timeString.split(":");
+        let hour = parseFloat(timeArray[0]);
+
+        if(timeArray[1].includes("pm")){
+            hour += 12; 
+        }
+
+        const minute = parseFloat(timeArray[1].replace(/am|pm/, ""))/60
+
+        return hour + minute;
+    }
+
+    employeeData = employeeData.trim().replace(/"/g,"");
+    employeeData = employeeData.replace(/Dog Walkers\n/g, "");
+    employeeData = employeeData.replace(/,Dog Exercise,/g, "");
+
+    let employeeDataArray = employeeData.split('\n')
+    employeeDataArray.shift()
+    
+    for(let i=0; i<employeeDataArray.length; i++){
+        if(i%2 === 0){
+            let times = employeeDataArray[i].split(' - ');
+            console.log(times)
+            employeeTimeIn = timeToNum(times[0]);
+            employeeTimeOut = timeToNum(times[1]);
+            continue;
+        }
+
+        //Only take the name.  Ignore total time.
+        employeeName = employeeDataArray[i].split(',')[1];
+
+        employees.push(new Employee(employeeName, employeeTimeIn, employeeTimeOut))
+
+        //Reset employee entry
+        employeeName = "";
+        employeeTimeIn = 0;
+        employeeTimeOut = 0;
+    }
+
+    console.log(employees)
+
+    return employees
+}
+
+function parseWalkList(file){
     const allEntries = []
     const buildings = new Set()
     const totals = new Map()
@@ -55,7 +111,7 @@ parseWalkList: (file) => {
         return request.match(/((1[0-2])|[1-9])?(pm|am)/g)
     }
 
-    //Pre parse the document to find the title
+    // Pre parse the document to find the title
     htmlData = htmlData.replace(/(&nbsp;&nbsp;)/g," ")
     let $ = cheerio.load(htmlData);
     $('div').each((i, el) => {
@@ -284,9 +340,9 @@ parseWalkList: (file) => {
     }
 
     return {allEntries, buildings, totals};
-},
+}
 
-assignEntries: (employees, entries) => {
+function assignEntries(employees, entries){
     const unassignable = []
     let counter = 0
     let max = employees.length - 1
@@ -384,9 +440,9 @@ assignEntries: (employees, entries) => {
     })
 
     return {employees, unassignable}
-},
+}
 
-assignBuilding: (employees, buildings, buildingTotals) => {
+function assignBuilding(employees, buildings, buildingTotals){
     const availableBuildings = Array.from(buildings);
     let unassignable = [];
     
@@ -456,9 +512,9 @@ assignBuilding: (employees, buildings, buildingTotals) => {
 
     //FIX UNASSIGNABLE
     return {employees, unassignable}
-},
+}
 
-printResults: (entries) => {
+function printResults(entries){
     console.log(chalk.black.bgGreen("!!!!!!!!!!!!!!!!!!!---------TODAY'S SCHEDULE---------!!!!!!!!!!!!!!!!!!!\n"))
     console.log("\t\tNumber of unassignable entries: " + chalk.red(entries.unassignable.length) + "\n")
 
@@ -490,6 +546,4 @@ printResults: (entries) => {
             console.log("")
         })
     })
-}
-
 }

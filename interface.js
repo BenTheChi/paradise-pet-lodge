@@ -1,7 +1,7 @@
+#!/usr/bin/env node
 'use strict';
 const readline = require('readline')
 const fs = require('fs')
-const Entry = require('./Entry').Entry;
 const Employee = require('./Employee').Employee;
 const parseWalkList = require('./index').parseWalkList;
 const assignEntries = require('./index').assignEntries;
@@ -79,9 +79,9 @@ const recursiveAsyncReadLine = function () {
                 let totals = new Map()
 
                 //Loop through each HTML schedule and parse it into allEntries
-                const directoryPath = path.join(__dirname,'schedules')
+                const directoryPath = path.join(process.cwd(),'schedules')
                 const files = fs.readdirSync(directoryPath)
-
+                
                 if(!files){
                     return console.log('Unable to scan directory: ' + err);
                 }
