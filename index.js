@@ -1,6 +1,7 @@
 "use strict"
 const cheerio = require('cheerio');
 const fs = require('fs');
+const path = require('path');
 const Entry = require('./Entry').Entry;
 const Employee = require('./Employee').Employee;
 
@@ -27,6 +28,7 @@ else{
         let walkInfo = parseWalkList('schedules/' + file)
         allEntries = allEntries.concat(walkInfo.allEntries)
         buildings = new Set([...buildings, ...walkInfo.buildings])
+        console.log(walkInfo.totals);
         totals = mergeTotals(totals, walkInfo.totals)
     })
     
@@ -44,10 +46,12 @@ else{
     }
 }
 
-console.log(entries.allEntries.length);
-console.log(entries.allEntries);
-console.log(entries.buildings);
-console.log(entries.totals);
+// console.log(allEntries);
+employees.forEach((employee) => {
+    console.log(employee)
+})
+// console.log(employees);
+console.log(unassignable)
 
 function getBuilding(run) {
     if(!run){
@@ -133,7 +137,6 @@ function parseWalkList(file){
     const totals = new Map()
     let walkData = fs.readFileSync(file, 'utf-8');
     walkData = walkData.trim().replace(/"/g,"").replace(/,Schedule/g,"");
-    
     function getTimeRequest(request){
         request = request.toLowerCase()
 
@@ -145,13 +148,15 @@ function parseWalkList(file){
     }
 
     //Save the date title from the first line
-    const dateTitle = walkData.substring(0, walkData.indexOf("\n"));
+    let dateTitle = walkData.substring(0, walkData.indexOf("\n"));
+    if(dateTitle.length > 45){
+        dateTitle = walkData.substring(0, walkData.indexOf("\r"));
+    }
 
     //Remove every line that has the datetitle
-    const regEx = new RegExp(dateTitle+"\n","g");
+    const regEx = new RegExp(dateTitle+"(\n|\r)","g");
     const walkDataArray = walkData.replace(regEx,"").split('\n');
     walkDataArray.forEach((row, index) => {
-        // console.log(row)
         let rowArray = row.trim().split(',');
         
         let time = .25;
@@ -169,7 +174,7 @@ function parseWalkList(file){
         const timeRequest = getTimeRequest(request);
         const special = "";
 
-        if(run.match(/\w{1,2} \d{1,2}/)){
+        if(run.match(/\w{1,2} +\d{1,2}/)){
             let building = getBuilding(run)
             buildings.add(building)
 
@@ -193,10 +198,12 @@ function parseWalkList(file){
             allEntries.push(entry)
         }
 
-        // rowArray.forEach((value, index) => {
-        //     console.log(index + ") " + value);
-        // })
-        // console.log("")
+        // if(index === 2){
+        //     rowArray.forEach((value, i) => {
+        //         console.log(i + ") " + value);
+        //     })
+        //     console.log("")
+        // }
     })
 
     return {allEntries, buildings, totals};
