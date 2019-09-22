@@ -7,7 +7,47 @@ const Employee = require('./Employee').Employee;
 const chalk = require('chalk');
 const csv = require('csv-parser');
 
-parseEmployeeList('employees/Export_Schedule_Print.csv')
+let employees = parseEmployeeList('employees/Export_Schedule_Print.csv');
+// let entries = parseWalkList('schedules/activities schedule.csv')
+let allEntries = []
+let unassignable = []
+let buildings = new Set()
+let totals = new Map()
+
+//Loop through each schedule and parse it into allEntries
+const directoryPath = path.join(process.cwd(),'schedules')
+const files = fs.readdirSync(directoryPath)
+
+if(!files){
+    console.log('Unable to scan directory: ' + err);
+}
+else{
+    //TODO Check if this works with the new files
+    files.forEach((file) => {
+        let walkInfo = parseWalkList('schedules/' + file)
+        allEntries = allEntries.concat(walkInfo.allEntries)
+        buildings = new Set([...buildings, ...walkInfo.buildings])
+        totals = mergeTotals(totals, walkInfo.totals)
+    })
+    
+    // console.log("Total Entries " + allEntries.length)
+    let buildingInfo = assignBuilding(employees, buildings, totals)
+    if(buildingInfo.unassignable.length > 0){
+        buildingInfo.unassignable.forEach((building) => {
+            console.log("Building " + building + " is unassignable")
+        })
+    }
+    else{
+        employees = buildingInfo.employees;
+        const entries = assignEntries(employees, allEntries)
+        unassignable = entries.unassignable
+    }
+}
+
+console.log(entries.allEntries.length);
+console.log(entries.allEntries);
+console.log(entries.buildings);
+console.log(entries.totals);
 
 function getBuilding(run) {
     if(!run){
@@ -39,7 +79,6 @@ function mergeTotals(original,incoming){
 }
 
 function parseEmployeeList(file){
-    const results = [];
     let employeeData = fs.readFileSync(file, 'utf-8');
     let employeeName = "";
     let employeeTimeIn = 0;
@@ -69,7 +108,6 @@ function parseEmployeeList(file){
     for(let i=0; i<employeeDataArray.length; i++){
         if(i%2 === 0){
             let times = employeeDataArray[i].split(' - ');
-            console.log(times)
             employeeTimeIn = timeToNum(times[0]);
             employeeTimeOut = timeToNum(times[1]);
             continue;
@@ -86,8 +124,6 @@ function parseEmployeeList(file){
         employeeTimeOut = 0;
     }
 
-    console.log(employees)
-
     return employees
 }
 
@@ -95,7 +131,82 @@ function parseWalkList(file){
     const allEntries = []
     const buildings = new Set()
     const totals = new Map()
-    let run, name, sex, age, breed, request, out, timeRequest,special = null;
+    let walkData = fs.readFileSync(file, 'utf-8');
+    walkData = walkData.trim().replace(/"/g,"").replace(/,Schedule/g,"");
+    
+    function getTimeRequest(request){
+        request = request.toLowerCase()
+
+        if(!request){
+            return null
+        }
+
+        return request.match(/((1[0-2])|[1-9])?(pm|am)/g)
+    }
+
+    //Save the date title from the first line
+    const dateTitle = walkData.substring(0, walkData.indexOf("\n"));
+
+    //Remove every line that has the datetitle
+    const regEx = new RegExp(dateTitle+"\n","g");
+    const walkDataArray = walkData.replace(regEx,"").split('\n');
+    walkDataArray.forEach((row, index) => {
+        // console.log(row)
+        let rowArray = row.trim().split(',');
+        
+        let time = .25;
+        if(rowArray[9].includes("Play")){
+            time = .5;
+        }
+        
+        const run = rowArray[14];
+        const name = rowArray[16];
+        const sex = rowArray[20];
+        const age = rowArray[22];
+        const breed = rowArray[24];
+        const request = rowArray[32];
+        const out = rowArray[27];
+        const timeRequest = getTimeRequest(request);
+        const special = "";
+
+        if(run.match(/\w{1,2} \d{1,2}/)){
+            let building = getBuilding(run)
+            buildings.add(building)
+
+            if(totals.has(building)){
+                totals.set(building,totals.get(building)+1)
+            }
+            else{
+                totals.set(building,1)
+            }
+        }
+
+        //Make a separate entry for each time request
+        if(timeRequest){
+            timeRequest.forEach((timeRequestEntry) => {
+                const entry = new Entry(run, name, sex, age, breed, request, out, special, timeRequestEntry, time)
+                allEntries.push(entry)
+            })
+        } 
+        else{
+            const entry = new Entry(run, name, sex, age, breed, request, out, special, timeRequest, time)
+            allEntries.push(entry)
+        }
+
+        // rowArray.forEach((value, index) => {
+        //     console.log(index + ") " + value);
+        // })
+        // console.log("")
+    })
+
+    return {allEntries, buildings, totals};
+}
+
+function parseWalkListe(file){
+    const allEntries = []
+    const buildings = new Set()
+    const totals = new Map()
+    let run, name, sex, age, breed, request, out, timeRequest, special = null;
     let targetCount = 0;
     let htmlData = fs.readFileSync(file, 'utf-8')
     let time = .25
