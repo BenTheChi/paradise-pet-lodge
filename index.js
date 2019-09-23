@@ -4,9 +4,9 @@ const fs = require('fs');
 const path = require('path');
 const Entry = require('./Entry').Entry;
 const Employee = require('./Employee').Employee;
+const gSheets = require('./gSheets');
 
 const chalk = require('chalk');
-const csv = require('csv-parser');
 
 let employees = parseEmployeeList('employees/Export_Schedule_Print.csv');
 // let entries = parseWalkList('schedules/activities schedule.csv')
@@ -23,13 +23,16 @@ if(!files){
     console.log('Unable to scan directory: ' + err);
 }
 else{
-    //TODO Check if this works with the new files
+    let dateTitle = null;
     files.forEach((file) => {
         let walkInfo = parseWalkList('schedules/' + file)
         allEntries = allEntries.concat(walkInfo.allEntries)
         buildings = new Set([...buildings, ...walkInfo.buildings])
-        console.log(walkInfo.totals);
+        // console.log(walkInfo.totals);
         totals = mergeTotals(totals, walkInfo.totals)
+        if(!dateTitle){
+            dateTitle = walkInfo.dateTitle;
+        }
     })
     
     // console.log("Total Entries " + allEntries.length)
@@ -44,14 +47,10 @@ else{
         const entries = assignEntries(employees, allEntries)
         unassignable = entries.unassignable
     }
-}
 
-// console.log(allEntries);
-employees.forEach((employee) => {
-    console.log(employee)
-})
-// console.log(employees);
-console.log(unassignable)
+    // console.log(allEntries);
+    gSheets.generateSchedules(dateTitle, employees, unassignable)
+}
 
 function getBuilding(run) {
     if(!run){
@@ -206,7 +205,8 @@ function parseWalkList(file){
         // }
     })
 
-    return {allEntries, buildings, totals};
+    //TODO edit dateTitle to make it nice 
+    return {allEntries, buildings, totals, dateTitle};
 }
 
 function parseWalkListe(file){
@@ -349,7 +349,6 @@ function parseWalkListe(file){
     $ = cheerio.load(htmlData);
     htmlData = htmlData.replace(/(&nbsp;&nbsp;)/g," ")
 
-    //TODO Add a way to dupliate/delete entries for the package deals
     $('div').each((i, el) => {
         const span = $(el).children().first()
         const value = span.text().trim()

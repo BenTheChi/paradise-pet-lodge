@@ -2,52 +2,95 @@
 const {google} = require('googleapis');
 const readline = require('readline');
 const fs = require('fs');
+const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
+const TOKEN_PATH = 'token.json';
 
-module.exports.generateSchedules = async function generateSchedules(entries){
-    const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
-    const TOKEN_PATH = 'token.json';
-    const unassignable = entries.unassignable;
-    const employees = entries.employees;
-
+module.exports.generateSchedules = async function generateSchedules(title, employees, unassignable){
     fs.readFile('credentials.json', (err, content) => {
         if (err) return console.log('Error loading client secret file:', err);
     
         // Authorize a client with credentials, then call the Google Sheets API.
-        authorize(JSON.parse(content), writeToSheets);
+        authorize(JSON.parse(content), generateSpreadsheet);
     });
 
-    async function writeToSheets(client){
-        const gsapi = google.sheets({version: 'v4', auth: client});
-        let data = await gsapi.spreadsheets.create({
-            resource: {properties: { title: "Date Title Here"}}
+    async function createSheets(gsapi){
+        let resource = {properties: { title }};
+        let sheets = [];
+        
+        employees.forEach((employee) => {
+            let sheet = {
+                properties: {
+                    title: employee.name,
+                    sheetType: 'GRID'
+                }
+            };
+
+            sheets.push(sheet);
         })
     
-        console.log(data)
+        resource.sheets = sheets;
 
-        // entries.employees.forEach((employee) => {
-        //     let buildingAssignments = ""
-    
-        //     employee.buildings.forEach((building) => {
-        //         buildingAssignments += building + " "
-        //     })
-            
-        //     employee.entries.forEach((entry) => {
-        //         console.log(entry.run + entry.name + entry.sex + entry.age + entry.breed)
-        //         if(entry.timeRequest){
-        //             console.log(entry.timeRequest)
-        //         }
-        //         if(entry.request){
-        //             console.log(entry.request)
-        //         }
-        //         if(entry.out){
-        //             console.log(entry.out)
-        //         }
-        //         if(entry.special){
-        //             console.log(entry.special)
-        //         }
-        //         console.log("")
-        //     })
+        let spreadsheet = await gsapi.spreadsheets.create({resource})
+
+        return spreadsheet;
+    }
+
+    //Creates a multi dimensional array representing the entries
+    function createSheetArray(entries){
+        let finalArray = [['RUN', 'PET NAME', 'BREED', 'AGE', 'SEX', 'TIME', 'REQUEST']]
+        entries.forEach((entry) => {
+            finalArray.push([entry.run, entry.name, entry.breed, entry.age, entry.sex, entry.timeRequest, entry.request])
+        })
+
+        return finalArray
+    }
+
+    async function writeToSheets(gsapi, spreadsheetId){
+        try{
+            //Write to sheet for each employee
+            //TODO Do this as a batchUpdate.  Make header bolded.
+            const promises = employees.map(async (employee) => {
+                const entries = employee.entries;
+                const range = `'${employee.name}'!A1`
+                
+                await gsapi.spreadsheets.values.update({
+                    spreadsheetId, 
+                    range,
+                    valueInputOption: 'USER_ENTERED',
+                    resource: {
+                        range,
+                        values: createSheetArray(entries)
+                    }
+                })
+            })
+
+            return await Promise.all(promises);
+        }
+        catch(error){
+            console.log(error)
+        }
+    }
+
+    async function generateSpreadsheet (client){
+        const gsapi = google.sheets({version: 'v4', auth: client});
+
+        const spreadsheet = await createSheets(gsapi);
+        // let spreadsheet = await gsapi.spreadsheets.create({
+        //     resource: createSheets()
         // })
+
+        console.log(spreadsheet.data.sheets)
+
+        if(spreadsheet.data){
+            const data = await writeToSheets(gsapi, spreadsheet.data.spreadsheetId);
+            console.log(data);
+        }
+        else{
+            console.log("Error creating spreadsheet")
+            return
+        }
+    
+        // console.log(spreadsheet.data.sheets)
     }
 }
 
@@ -88,31 +131,4 @@ function getNewToken(oAuth2Client, callback) {
         callback(oAuth2Client);
         });
     });
-}
-
-async function writeStuff(cl){
-    const gsapi = google.sheets({version: 'v4', auth: cl});
-
-    const opt = {
-        spreadsheetId: '1cd9tgF-N-hjT10OQQ8Ni2VIliCC9lc4Fk39e90OjFpo',
-        range: 'A1:B4'
-    };
-
-    const updateOptions = {
-        spreadsheetId: '1cd9tgF-N-hjT10OQQ8Ni2VIliCC9lc4Fk39e90OjFpo',
-        range: 'A6',
-        valueInputOption: 'USER_ENTERED',
-        resource: { values: [['Gir', 23, "Something message here", false], ['Gir', null, "Something message here", true]] }
-    }
-    const updateOptions2 = {
-        spreadsheetId: '1cd9tgF-N-hjT10OQQ8Ni2VIliCC9lc4Fk39e90OjFpo',
-        range: 'A6',
-        valueInputOption: 'USER_ENTERED',
-        resource: { values: [['Gir', 23, "Something message here", false], ['Gir', null, "Something message here", true]] }
-    }
-
-    let data = await gsapi.spreadsheets.values.update(updateOptions);
-    let data = await gsapi.spreadsheets.values.update(updateOptions);
-
-    console.log(data.status);
 }
