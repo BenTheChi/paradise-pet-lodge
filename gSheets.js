@@ -45,11 +45,10 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
         return finalArray
     }
 
-    async function writeToSheets(gsapi, spreadsheetId){
+    async function writeToSheets(gsapi, sheets, spreadsheetId){
         try{
             //Write to sheet for each employee
-            //TODO Do this as a batchUpdate.  Make header bolded.
-            const promises = employees.map(async (employee) => {
+            let promises = employees.map(async (employee, index) => {
                 const entries = employee.entries;
                 const range = `'${employee.name}'!A1`
                 
@@ -64,7 +63,42 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
                 })
             })
 
-            return await Promise.all(promises);
+            await Promise.all(promises);
+
+            promises = sheets.map(async (sheet) => {
+                await gsapi.spreadsheets.batchUpdate({
+                    spreadsheetId, 
+                    resource: {
+                        requests: [
+                            {
+                              repeatCell: {
+                                range: {
+                                  sheetId: sheet.properties.sheetId,
+                                  startRowIndex: 0,
+                                  endRowIndex: 1
+                                },
+                                cell: {
+                                  userEnteredFormat: {
+                                    horizontalAlignment: "CENTER",
+                                    textFormat: {
+                                      foregroundColor: {
+                                        red: 0.0,
+                                        green: 0.0,
+                                        blue: 0.0
+                                      },
+                                      bold: true,
+                                    }
+                                  }
+                                },
+                                fields: 'userEnteredFormat(backgroundColor,textFormat)'
+                              }
+                            },
+                          ]
+                    }
+                })
+            })
+
+            await Promise.all(promises);
         }
         catch(error){
             console.log(error)
@@ -75,14 +109,11 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
         const gsapi = google.sheets({version: 'v4', auth: client});
 
         const spreadsheet = await createSheets(gsapi);
-        // let spreadsheet = await gsapi.spreadsheets.create({
-        //     resource: createSheets()
-        // })
 
-        console.log(spreadsheet.data.sheets)
+        console.log(spreadsheet.data.sheets);
 
         if(spreadsheet.data){
-            const data = await writeToSheets(gsapi, spreadsheet.data.spreadsheetId);
+            const data = await writeToSheets(gsapi, spreadsheet.data.sheets, spreadsheet.data.spreadsheetId);
             console.log(data);
         }
         else{

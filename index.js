@@ -44,12 +44,48 @@ else{
     }
     else{
         employees = buildingInfo.employees;
-        const entries = assignEntries(employees, allEntries)
+        let entries = assignEntries(employees, allEntries)
+        employees = entries.employees;
+
+        let removedEmployees = [];
+        let enoughTimeArray = enoughTimeInShift(employees)
+
+        while(!enoughTimeArray.every(workedEnough => workedEnough)){
+            
+            for(let i=0; i<enoughTimeArray.length; i++){
+                if(!enoughTimeArray[i]){
+                    //This i in employees array = i in enoughTimeInShift's returned array
+                    let removedEmployee = employees.splice(i,1)
+                    removedEmployee.entries = [];
+                    removedEmployees.push(removedEmployee)
+
+                    //TODO
+                    entries = assignEntries(employees, allEntries)
+                    employees = entries.employees;
+                    break;
+                }
+            }
+        }
+
         unassignable = entries.unassignable
     }
 
-    // console.log(allEntries);
-    gSheets.generateSchedules(dateTitle, employees, unassignable)
+    console.log(allEntries);
+    // gSheets.generateSchedules(dateTitle, employees, unassignable)
+}
+
+function enoughTimeInShift(employees){
+    return employees.map((employee) => {
+        const total = employee.entries.reduce((total, entry) => {
+            total + entry.time
+        });
+
+        if(total < (employee.timeOut - employee.timeIn)/2){
+            return false;
+        }
+
+        return true;
+    })
 }
 
 function getBuilding(run) {
