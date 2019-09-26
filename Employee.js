@@ -1,34 +1,49 @@
 class Employee{
     constructor(name, timeIn, timeOut){
+        if(timeOut < timeIn){
+            throw "Time Out must be greater than Time In"
+        }
+
         this.name = name;
         this.timeIn = timeIn;
         this.timeOut = timeOut;
         this.entries = []
-        
-        if(timeOut < timeIn){
-            this.AmTimeLeft = 0
-            this.PmTimeLeft = 0
+        this.buildings = new Set();
+        this.getTimeBlocks()
+    }
+
+    getTimeBlocks(){
+        const AM_CUTOFF = 10;
+        const NOON_CUTOFF = 14;
+        let timeIn = this.timeIn;
+        let timeOut = this.timeOut;
+
+        this.PmTimeLeft = 0;
+        this.NoonTimeLeft = 0;
+        this.AmTimeLeft = 0;
+
+        if(this.timeOut > NOON_CUTOFF){
+            if(timeIn >= NOON_CUTOFF){
+                this.PmTimeLeft = timeOut - timeIn;
+                return
+            }
+            else{
+                this.PmTimeLeft = timeOut - NOON_CUTOFF;
+                timeOut = NOON_CUTOFF;
+            }
         }
-        else if(timeIn <= 12 && timeOut <= 12){
-            this.AmTimeLeft = timeOut - timeIn;
-            this.PmTimeLeft = 0;
-        }
-        else if(timeIn > 12 && timeOut > 12){
-            this.AmTimeLeft = 0;
-            this.PmTimeLeft = timeOut - timeIn;
-        }
-        else if(timeIn <= 12 && timeOut > 12){
-            this.AmTimeLeft = 12 - timeIn
-            this.PmTimeLeft = timeOut - 12
-        }
-        else{
-            this.AmTimeLeft = 0
-            this.PmTimeLeft = 0
+        if(this.timeOut > AM_CUTOFF){
+            if(timeIn >= AM_CUTOFF){
+                this.NoonTimeLeft = timeOut - timeIn;
+                return
+            }
+            else{
+                this.NoonTimeLeft = timeOut - AM_CUTOFF;
+                timeOut = AM_CUTOFF;
+            }
         }
 
-        // const scheduleLength = (timeOut - timeIn) * 4;
-        // this.schedule = new Array(scheduleLength);
-        this.buildings = new Set();
+        this.AmTimeLeft = timeOut - timeIn;
     }
 
     formattedTimeIn(){
