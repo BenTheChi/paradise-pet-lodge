@@ -11,6 +11,7 @@ const chalk = require('chalk');
 let employees = parseEmployeeList('employees/Export_Schedule_Print.csv');
 // let entries = parseWalkList('schedules/activities schedule.csv')
 let allEntries = []
+let anyTimeEntries = []
 let unassignable = []
 let buildings = new Set()
 let totals = new Map()
@@ -27,13 +28,24 @@ else{
     
     files.forEach((file) => {
         let walkInfo = parseWalkList('schedules/' + file)
+
         allEntries = allEntries.concat(walkInfo.allEntries)
+        anyTimeEntries = anyTimeEntries.concat(walkInfo.anyTimeEntries)
+
         buildings = new Set([...buildings, ...walkInfo.buildings])
         // console.log(walkInfo.totals);
         totals = mergeTotals(totals, walkInfo.totals)
         if(!dateTitle){
             dateTitle = walkInfo.dateTitle;
         }
+    })
+
+    allEntries.sort((a, b) => (a.run > b.run) ? 1 : -1);
+    anyTimeEntries.sort((a, b) => (a.run > b.run) ? 1 : -1);
+    allEntries = allEntries.concat(anyTimeEntries);
+
+    allEntries.forEach((entry) => {
+        console.log(entry.timeRequest)
     })
     
     // console.log("Total Entries " + allEntries.length)
@@ -52,8 +64,6 @@ else{
         let enoughTimeArray = enoughTimeInShift(employees)
 
         while(!enoughTimeArray.every(workedEnough => workedEnough)){
-            console.log(enoughTimeArray)
-
             for(let i=0; i<enoughTimeArray.length; i++){
                 if(!enoughTimeArray[i]){
                     //This i in employees array = i in enoughTimeInShift's returned array
@@ -74,7 +84,6 @@ else{
         unassignable = entries.unassignable
     }
 
-    console.log(employees);
     // gSheets.generateSchedules(dateTitle, employees, unassignable)
 }
 
@@ -176,7 +185,8 @@ function parseEmployeeList(file){
 }
 
 function parseWalkList(file){
-    const allEntries = []
+    let allEntries = []
+    let anyTimeEntries = []
     const buildings = new Set()
     const totals = new Map()
     let walkData = fs.readFileSync(file, 'utf-8');
@@ -237,10 +247,10 @@ function parseWalkList(file){
                     const entry = new Entry(run, name, sex, age, breed, request, out, special, timeRequestEntry.toLowerCase(), time)
                     allEntries.push(entry)
                 })
-            } 
+            }
             else{
                 const entry = new Entry(run, name, sex, age, breed, request, out, special, timeRequest, time)
-                allEntries.push(entry)
+                anyTimeEntries.push(entry)
             }
         } catch (error) {
             console.log(error)
@@ -255,7 +265,8 @@ function parseWalkList(file){
         // }
     })
 
-    return {allEntries, buildings, totals, dateTitle};
+
+    return {allEntries, anyTimeEntries, buildings, totals, dateTitle};
 }
 
 function parseWalkListe(file){
@@ -509,9 +520,9 @@ function parseWalkListe(file){
 }
 
 function assignEntries(employees, entries){
-    const unassignable = []
-    let counter = 0
-    let max = employees.length - 1
+    const unassignable = [];
+    let counter = 0;
+    let max = employees.length - 1;
     
     function increaseCounter(){
         counter++
@@ -537,7 +548,19 @@ function assignEntries(employees, entries){
             return parseInt(timeNum[0]) + 12
         }
 
-        return null;
+        return null
+    }
+
+    function sameRunExists(employee, run){
+        for(let i=0; i<employee.entries.length; i++){
+            const entry = employee.entries[i];
+
+            if(entry.run === run){
+                return true;
+            }
+
+            return false;
+        }
     }
 
     entries.forEach((entry) => {        
@@ -555,7 +578,11 @@ function assignEntries(employees, entries){
                 return
             }
 
-            if(AmTimeLeft <= 0 && PmTimeLeft <= 0){
+            if(sameRunExists(employees[counter], entry.run)){
+                increaseCounter()
+                return
+            }
+            if(AmTimeLeft <= 0 && PmTimeLeft <= 0 && NoonTimeLeft <= 0){
                 increaseCounter()
                 continue
             }
