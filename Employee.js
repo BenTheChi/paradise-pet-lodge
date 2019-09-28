@@ -44,6 +44,10 @@ class Employee{
         }
 
         this.AmTimeLeft = timeOut - timeIn;
+
+        this.totalAm = this.AmTimeLeft;
+        this.totalNoon = this.totalNoon;
+        this.totalPm = this.PmTimeLeft;
     }
 
     formattedTimeIn(){

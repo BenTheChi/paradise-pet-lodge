@@ -17,6 +17,20 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
         let resource = {properties: { title }};
         let sheets = [];
         
+        sheets.push({
+            properties: {
+                title: "Employees",
+                sheetType: 'GRID'
+            }
+        })
+
+        sheets.push({
+            properties: {
+                title: "Unassignable",
+                sheetType: 'GRID'
+            }
+        })
+
         employees.forEach((employee) => {
             let sheet = {
                 properties: {
@@ -37,12 +51,35 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
 
     //Creates a multi dimensional array representing the entries
     function createSheetArray(entries){
-        let finalArray = [['RUN', 'PET NAME', 'BREED', 'AGE', 'SEX', 'TIME', 'REQUEST']]
+        let finalArray = [['TYPE', 'RUN', 'PET NAME', 'BREED', 'AGE', 'SEX', 'TIME REQUEST', 'TIME', 'REQUEST', 'INITIALS']]
         entries.forEach((entry) => {
-            finalArray.push([entry.run, entry.name, entry.breed, entry.age, entry.sex, entry.timeRequest, entry.request])
+            finalArray.push([entry.title, entry.run, entry.name, entry.breed, entry.age, entry.sex, entry.timeRequest, entry.time, entry.request])
         })
 
         return finalArray
+    }
+
+    function createEmployeeArray(employees){
+        let finalArray = [['NAME', 'BUILDINGS', 'TIME IN', 'TIME OUT', 'AM USED', 'NOON USED', 'PM USED']]
+        employees.forEach((employee) => {
+            let usedAm = "N/A"
+            let usedNoon = "N/A"
+            let usedPm = "N/A"
+
+            if(employee.totalAm != 0){
+                usedAm = Math.floor(employee.AmTimeLeft/employee.totalAm*100) + "%"
+            }
+            if(employee.totalNoon != 0){
+                usedAm = Math.floor(employee.NoonTimeLeft/employee.totalNoon*100) + "%"
+            }
+            if(employee.totalPm != 0){
+                usedAm = Math.floor(employee.PmTimeLeft/employee.totalPm*100) + "%"
+            }
+
+            //TODO Check to see how to add formulas and print the building set
+            finalArray.push([employee.name, employee.buildings.toString(), employee.formattedTimeIn(), employee.formattedTimeOut(), usedAm, usedNoon, usedPm])
+        })
+        return finalArray;
     }
 
     async function writeToSheets(gsapi, sheets, spreadsheetId){
@@ -62,6 +99,28 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
                     }
                 })
             })
+
+            //Create the employee info sheet
+            promises.push(await gsapi.spreadsheets.values.update({
+                spreadsheetId, 
+                range: `'Employees'!A1`,
+                valueInputOption: 'USER_ENTERED',
+                resource: {
+                    range: `'Employees'!A1`,
+                    values: createEmployeeArray(employees)
+                }
+            }))
+
+            //Create the unassignable employee sheet
+            promises.push(await gsapi.spreadsheets.values.update({  
+                spreadsheetId,
+                range: `'Unassignable'!A1`,
+                valueInputOption: 'USER_ENTERED',
+                resource: {
+                    range: `'Unassignable'!A1`,
+                    values: createSheetArray(unassignable)
+                }
+            }))
 
             await Promise.all(promises);
 

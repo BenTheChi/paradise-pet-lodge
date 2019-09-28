@@ -45,7 +45,7 @@ else{
     allEntries = allEntries.concat(anyTimeEntries);
 
     allEntries.forEach((entry) => {
-        console.log(entry.timeRequest)
+        console.log(entry)
     })
     
     // console.log("Total Entries " + allEntries.length)
@@ -213,11 +213,8 @@ function parseWalkList(file){
     walkDataArray.forEach((row, index) => {
         let rowArray = row.trim().split(',');
         
-        let time = .25;
-        if(rowArray[9].includes("Play")){
-            time = .5;
-        }
-        
+        let time = .25;        
+        const title = rowArray[9];
         const run = rowArray[14];
         const name = rowArray[16];
         const sex = rowArray[20];
@@ -227,6 +224,10 @@ function parseWalkList(file){
         const out = rowArray[27];
         const timeRequest = getTimeRequest(request);
         const special = "";
+
+        if(title.includes("Play")){
+            time = .5;
+        }
 
         if(run.match(/\w{1,2} +\d{1,2}/)){
             let building = getBuilding(run)
@@ -244,12 +245,12 @@ function parseWalkList(file){
             //Make a separate entry for each time request
             if(timeRequest){
                 timeRequest.forEach((timeRequestEntry) => {
-                    const entry = new Entry(run, name, sex, age, breed, request, out, special, timeRequestEntry.toLowerCase(), time)
+                    const entry = new Entry(title, run, name, sex, age, breed, request, out, special, timeRequestEntry.toLowerCase(), time)
                     allEntries.push(entry)
                 })
             }
             else{
-                const entry = new Entry(run, name, sex, age, breed, request, out, special, timeRequest, time)
+                const entry = new Entry(title, run, name, sex, age, breed, request, out, special, timeRequest, time)
                 anyTimeEntries.push(entry)
             }
         } catch (error) {
@@ -740,38 +741,4 @@ function assignBuilding(employees, buildings, buildingTotals){
 
     //FIX UNASSIGNABLE
     return {employees, unassignable}
-}
-
-function printResults(entries){
-    console.log(chalk.black.bgGreen("!!!!!!!!!!!!!!!!!!!---------TODAY'S SCHEDULE---------!!!!!!!!!!!!!!!!!!!\n"))
-    console.log("\t\tNumber of unassignable entries: " + chalk.red(entries.unassignable.length) + "\n")
-
-    entries.employees.forEach((employee) => {
-        let buildingAssignments = ""
-
-        employee.buildings.forEach((building) => {
-            buildingAssignments += building + " "
-        })
-        console.log(chalk.magenta("\n------------------------------------------------------------------"))
-        console.log("\t\t" + chalk.black.bgCyan(employee.name.toUpperCase()) + " (" + buildingAssignments.trim() + ")")
-        console.log("\t\tIN: " + chalk.green(employee.formattedTimeIn()))
-        console.log("\t\tOUT: " + chalk.green(employee.formattedTimeOut()))
-        console.log("\t\ttotal entries: " + chalk.green(employee.entries.length) + "\n")
-        employee.entries.forEach((entry) => {
-            console.log(chalk.blue("RUN:") + entry.run + chalk.blue("  NAME:") + entry.name + chalk.blue("  SEX:") + entry.sex + chalk.blue("  AGE:") + entry.age + chalk.blue("  BREED:") + entry.breed)
-            if(entry.timeRequest){
-                console.log(chalk.blue("TIME REQUEST:") + entry.timeRequest)
-            }
-            if(entry.request){
-                console.log(chalk.blue("REQUEST:") + entry.request)
-            }
-            if(entry.out){
-                console.log(chalk.blue("OUT:") + entry.out)
-            }
-            if(entry.special){
-                console.log(chalk.blue("SPECIAL:") + entry.special)
-            }
-            console.log("")
-        })
-    })
 }
