@@ -44,9 +44,9 @@ else{
     anyTimeEntries.sort((a, b) => (a.run > b.run) ? 1 : -1);
     allEntries = allEntries.concat(anyTimeEntries);
 
-    allEntries.forEach((entry) => {
-        console.log(entry)
-    })
+    // allEntries.forEach((entry) => {
+    //     console.log(entry)
+    // })
     
     // console.log("Total Entries " + allEntries.length)
     let buildingInfo = assignBuilding(employees, buildings, totals)
@@ -84,7 +84,7 @@ else{
         unassignable = entries.unassignable
     }
 
-    // gSheets.generateSchedules(dateTitle, employees, unassignable)
+    gSheets.generateSchedules(dateTitle, employees, unassignable)
 }
 
 function enoughTimeInShift(employees){
@@ -159,8 +159,8 @@ function parseEmployeeList(file){
     employeeData = employeeData.replace(/Dog Walkers\n/g, "");
     employeeData = employeeData.replace(/,Dog Exercise,/g, "");
 
-    let employeeDataArray = employeeData.split('\n')
-    employeeDataArray.shift()
+    let employeeDataArray = employeeData.split('\n');
+    employeeDataArray.shift();
     
     for(let i=0; i<employeeDataArray.length; i++){
         if(i%2 === 0){
@@ -627,7 +627,7 @@ function assignEntries(employees, entries){
                     }
 
                     employees[counter].AmTimeLeft -= entry.time
-
+                    
                     increaseCounter()
                     return
                 }

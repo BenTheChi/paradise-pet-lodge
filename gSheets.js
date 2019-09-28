@@ -51,9 +51,9 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
 
     //Creates a multi dimensional array representing the entries
     function createSheetArray(entries){
-        let finalArray = [['TYPE', 'RUN', 'PET NAME', 'BREED', 'AGE', 'SEX', 'TIME REQUEST', 'TIME', 'REQUEST', 'INITIALS']]
+        let finalArray = [['TYPE', 'RUN', 'PET NAME', 'BREED', 'AGE', 'SEX', 'OUT TIME', 'TIME', 'REQUEST', 'INITIALS']]
         entries.forEach((entry) => {
-            finalArray.push([entry.title, entry.run, entry.name, entry.breed, entry.age, entry.sex, entry.timeRequest, entry.time, entry.request])
+            finalArray.push([entry.title, entry.run, entry.name, entry.breed, entry.age, entry.sex, entry.timeRequest, entry.time*60+" min", entry.request, ""])
         })
 
         return finalArray
@@ -70,14 +70,15 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
                 usedAm = Math.floor(employee.AmTimeLeft/employee.totalAm*100) + "%"
             }
             if(employee.totalNoon != 0){
-                usedAm = Math.floor(employee.NoonTimeLeft/employee.totalNoon*100) + "%"
+                usedNoon = Math.floor(employee.NoonTimeLeft/employee.totalNoon*100) + "%"
             }
             if(employee.totalPm != 0){
-                usedAm = Math.floor(employee.PmTimeLeft/employee.totalPm*100) + "%"
+                usedPm = Math.floor(employee.PmTimeLeft/employee.totalPm*100) + "%"
             }
+            
 
             //TODO Check to see how to add formulas and print the building set
-            finalArray.push([employee.name, employee.buildings.toString(), employee.formattedTimeIn(), employee.formattedTimeOut(), usedAm, usedNoon, usedPm])
+            finalArray.push([employee.name, Array.from(employee.buildings).join(', '), employee.formattedTimeIn(), employee.formattedTimeOut(), usedAm, usedNoon, usedPm])
         })
         return finalArray;
     }
@@ -85,7 +86,7 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
     async function writeToSheets(gsapi, sheets, spreadsheetId){
         try{
             //Write to sheet for each employee
-            let promises = employees.map(async (employee, index) => {
+            let promises = employees.map(async (employee) => {
                 const entries = employee.entries;
                 const range = `'${employee.name}'!A1`
                 
@@ -125,34 +126,75 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
             await Promise.all(promises);
 
             promises = sheets.map(async (sheet) => {
+                let requests = [
+                    {
+                        repeatCell: {
+                          range: {
+                            sheetId: sheet.properties.sheetId,
+                            startRowIndex: 0,
+                            endRowIndex: 1
+                          },
+                          cell: {
+                            userEnteredFormat: {
+                            //   wrapStrategy: "WRAP",
+                              horizontalAlignment: "CENTER",
+                              textFormat: {
+                                foregroundColor: {
+                                  red: 0.0,
+                                  green: 0.0,
+                                  blue: 0.0
+                                },
+                                bold: true,
+                              }
+                            }
+                          },
+                          fields: 'userEnteredFormat(horizontalAlignment,backgroundColor,textFormat)'
+                        }
+                    },
+                    {
+                        repeatCell: {
+                            range: {
+                              sheetId: sheet.properties.sheetId,
+                              startRowIndex: 0,
+                              startColumnIndex: 0
+                            },
+                            cell: {
+                              userEnteredFormat: {
+                                wrapStrategy: "WRAP",
+                              }
+                            },
+                            fields: 'userEnteredFormat(wrapStrategy)'
+                          }
+                    }
+                ]
+
+                if(sheet.properties.title === "Employees"){
+                    requests.push({
+                        repeatCell: {
+                          range: {
+                            sheetId: sheet.properties.sheetId,
+                            startRowIndex: 1,
+                            endRowIndex: 100,
+                            startColumnIndex: 2,
+                            endColumnIndex: 4
+                          },
+                          cell: {
+                            userEnteredFormat: {
+                              numberFormat: {
+                                type: "TIME",
+                                pattern: `hh:mm AM/PM`
+                              }
+                            }
+                          },
+                          fields: 'userEnteredFormat(numberFormat)'
+                        }
+                    })
+                }
+
                 await gsapi.spreadsheets.batchUpdate({
                     spreadsheetId, 
                     resource: {
-                        requests: [
-                            {
-                              repeatCell: {
-                                range: {
-                                  sheetId: sheet.properties.sheetId,
-                                  startRowIndex: 0,
-                                  endRowIndex: 1
-                                },
-                                cell: {
-                                  userEnteredFormat: {
-                                    horizontalAlignment: "CENTER",
-                                    textFormat: {
-                                      foregroundColor: {
-                                        red: 0.0,
-                                        green: 0.0,
-                                        blue: 0.0
-                                      },
-                                      bold: true,
-                                    }
-                                  }
-                                },
-                                fields: 'userEnteredFormat(backgroundColor,textFormat)'
-                              }
-                            },
-                          ]
+                        requests
                     }
                 })
             })
@@ -169,11 +211,8 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
 
         const spreadsheet = await createSheets(gsapi);
 
-        console.log(spreadsheet.data.sheets);
-
         if(spreadsheet.data){
             const data = await writeToSheets(gsapi, spreadsheet.data.sheets, spreadsheet.data.spreadsheetId);
-            console.log(data);
         }
         else{
             console.log("Error creating spreadsheet")

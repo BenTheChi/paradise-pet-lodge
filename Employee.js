@@ -7,9 +7,9 @@ class Employee{
         this.name = name;
         this.timeIn = timeIn;
         this.timeOut = timeOut;
-        this.entries = []
+        this.entries = [];
         this.buildings = new Set();
-        this.getTimeBlocks()
+        this.getTimeBlocks();
     }
 
     getTimeBlocks(){
@@ -21,6 +21,9 @@ class Employee{
         this.PmTimeLeft = 0;
         this.NoonTimeLeft = 0;
         this.AmTimeLeft = 0;
+        this.totalAm = 0;
+        this.totalNoon = 0;
+        this.totalPm = 0;
 
         if(this.timeOut > NOON_CUTOFF){
             if(timeIn >= NOON_CUTOFF){
@@ -42,11 +45,9 @@ class Employee{
                 timeOut = AM_CUTOFF;
             }
         }
-
         this.AmTimeLeft = timeOut - timeIn;
-
         this.totalAm = this.AmTimeLeft;
-        this.totalNoon = this.totalNoon;
+        this.totalNoon = this.NoonTimeLeft;
         this.totalPm = this.PmTimeLeft;
     }
 
