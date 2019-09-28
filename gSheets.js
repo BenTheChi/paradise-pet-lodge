@@ -188,6 +188,27 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
                         }
                     })
                 }
+                else{
+                    requests.push({
+                        repeatCell: {
+                            range: {
+                              sheetId: sheet.properties.sheetId,
+                              startRowIndex: 1,
+                              startColumnIndex: 6,
+                              endColumnIndex: 7
+                            },
+                            cell: {
+                              userEnteredFormat: {
+                                numberFormat: {
+                                  type: "TIME",
+                                  pattern: `hh:mm AM/PM`
+                                }
+                              }
+                            },
+                            fields: 'userEnteredFormat(numberFormat)'
+                          }
+                    })
+                }
 
                 await gsapi.spreadsheets.batchUpdate({
                     spreadsheetId, 

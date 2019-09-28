@@ -8,7 +8,6 @@ const gSheets = require('./gSheets');
 const chalk = require('chalk');
 
 let employees = parseEmployeeList('employees/Export_Schedule_Print.csv');
-// let entries = parseWalkList('schedules/activities schedule.csv')
 let allEntries = []
 let anyTimeEntries = []
 let unassignable = []
@@ -74,10 +73,10 @@ else{
         }
 
         employees = employees.concat(removedEmployees);
-        unassignable = entries.unassignable
+        unassignable = entries.unassignable;
     }
 
-    gSheets.generateSchedules(dateTitle, employees, unassignable)
+    gSheets.generateSchedules(dateTitle, employees, unassignable);
 }
 
 function enoughTimeInShift(employees){
@@ -251,7 +250,6 @@ function parseWalkList(file){
         }
     })
 
-
     return {allEntries, anyTimeEntries, buildings, totals, dateTitle};
 }
 
@@ -287,26 +285,25 @@ function assignEntries(employees, entries){
         return null
     }
 
-    function sameRunExists(employee, run){
+    function sameRunExists(employee, run, name, request){
         for(let i=0; i<employee.entries.length; i++){
             const entry = employee.entries[i];
 
-            if(entry.run === run){
+            if(entry.run === run && name === entry.name && !request.toLowerCase().includes("alone")){
                 return true;
             }
-
-            return false;
         }
+        return false;
     }
 
     entries.forEach((entry) => {        
         let startCount = counter
         do {
+            let type = null
+            let decimalTime = convertToDecimalTime(entry.timeRequest)
             let AmTimeLeft = employees[counter].AmTimeLeft
             let PmTimeLeft = employees[counter].PmTimeLeft
             let NoonTimeLeft = employees[counter].NoonTimeLeft
-            let type = null
-            let decimalTime = convertToDecimalTime(entry.timeRequest)
 
             const building = getBuilding(entry.run)
             if(!building){
@@ -314,7 +311,7 @@ function assignEntries(employees, entries){
                 return
             }
 
-            if(sameRunExists(employees[counter], entry.run)){
+            if(sameRunExists(employees[counter], entry.run, entry.name, entry.request)){
                 increaseCounter()
                 return
             }
@@ -328,7 +325,7 @@ function assignEntries(employees, entries){
                     continue
                 }
             }
-            
+
             if(decimalTime){
                 if(decimalTime >= 14){
                     type = "pm";
