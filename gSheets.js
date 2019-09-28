@@ -62,9 +62,9 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
     function createEmployeeArray(employees){
         let finalArray = [['NAME', 'BUILDINGS', 'TIME IN', 'TIME OUT', 'AM USED', 'NOON USED', 'PM USED']]
         employees.forEach((employee) => {
-            let usedAm = "N/A"
-            let usedNoon = "N/A"
-            let usedPm = "N/A"
+            let usedAm = ""
+            let usedNoon = ""
+            let usedPm = ""
 
             if(employee.totalAm != 0){
                 usedAm = Math.floor(employee.AmTimeLeft/employee.totalAm*100) + "%"
@@ -76,8 +76,7 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
                 usedPm = Math.floor(employee.PmTimeLeft/employee.totalPm*100) + "%"
             }
             
-
-            //TODO Check to see how to add formulas and print the building set
+            //TODO Check to see how to add formulas
             finalArray.push([employee.name, Array.from(employee.buildings).join(', '), employee.formattedTimeIn(), employee.formattedTimeOut(), usedAm, usedNoon, usedPm])
         })
         return finalArray;
@@ -136,7 +135,6 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
                           },
                           cell: {
                             userEnteredFormat: {
-                            //   wrapStrategy: "WRAP",
                               horizontalAlignment: "CENTER",
                               textFormat: {
                                 foregroundColor: {
@@ -218,8 +216,6 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
             console.log("Error creating spreadsheet")
             return
         }
-    
-        // console.log(spreadsheet.data.sheets)
     }
 }
 
