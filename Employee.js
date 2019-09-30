@@ -28,27 +28,29 @@ class Employee{
         if(this.timeOut > NOON_CUTOFF){
             if(timeIn >= NOON_CUTOFF){
                 this.PmTimeLeft = timeOut - timeIn;
+                this.totalPm = this.PmTimeLeft;
                 return
             }
             else{
                 this.PmTimeLeft = timeOut - NOON_CUTOFF;
+                this.totalPm = this.PmTimeLeft;
                 timeOut = NOON_CUTOFF;
             }
         }
         if(this.timeOut > AM_CUTOFF){
             if(timeIn >= AM_CUTOFF){
                 this.NoonTimeLeft = timeOut - timeIn;
+                this.totalNoon = this.NoonTimeLeft;
                 return
             }
             else{
                 this.NoonTimeLeft = timeOut - AM_CUTOFF;
+                this.totalNoon = this.NoonTimeLeft;
                 timeOut = AM_CUTOFF;
             }
         }
         this.AmTimeLeft = timeOut - timeIn;
         this.totalAm = this.AmTimeLeft;
-        this.totalNoon = this.NoonTimeLeft;
-        this.totalPm = this.PmTimeLeft;
     }
 
     formattedTimeIn(){

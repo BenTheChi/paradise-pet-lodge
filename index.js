@@ -7,10 +7,8 @@ const gSheets = require('./gSheets');
 
 const chalk = require('chalk');
 
-let employees = parseEmployeeList('employees/Export_Schedule_Print.csv');
 let allEntries = []
 let anyTimeEntries = []
-let unassignable = []
 let buildings = new Set()
 let totals = new Map()
 
@@ -40,62 +38,90 @@ else{
     allEntries.sort((a, b) => (a.run > b.run) ? 1 : -1);
     anyTimeEntries.sort((a, b) => (a.run > b.run) ? 1 : -1);
     allEntries = allEntries.concat(anyTimeEntries);
+    
+    console.log("All Entries Total: " + allEntries.length);
 
-    let buildingInfo = assignBuilding(employees, buildings, totals)
-    if(buildingInfo.unassignable.length > 0){
-        buildingInfo.unassignable.forEach((building) => {
-            console.log("Building " + building + " is unassignable")
-        })
-    }
-    else{
-        employees = buildingInfo.employees;
-        let entries = assignEntries(employees, allEntries)
-        employees = entries.employees;
+    const employeeEntries = assignEmployees(allEntries, buildings, totals);
 
-        let removedEmployees = [];
-        let enoughTimeArray = enoughTimeInShift(employees)
-
-        while(!enoughTimeArray.every(workedEnough => workedEnough)){
-            for(let i=0; i<enoughTimeArray.length; i++){
-                if(!enoughTimeArray[i]){
-                    //This i in employees array = i in enoughTimeInShift's returned array
-                    let removedEmployee = employees.splice(i,1)[0];
-                    removedEmployee.entries = [];
-                    removedEmployees.push(removedEmployee);
-
-                    entries = assignEntries(employees, allEntries);
-                    employees = entries.employees;
-                    break;
-                }
-            }
-
-            enoughTimeArray = enoughTimeInShift(employees);
-        }
-
-        employees = employees.concat(removedEmployees);
-        unassignable = entries.unassignable;
-    }
-
-    gSheets.generateSchedules(dateTitle, employees, unassignable);
+    gSheets.generateSchedules(dateTitle, employeeEntries.employees, employeeEntries.unassignable);
 }
 
-function enoughTimeInShift(employees){
+function assignEmployees(allEntries, buildings, totals){
+    let employees = parseEmployeeList('employees/Export_Schedule_Print.csv');
+    let buildingInfo = assignBuilding(employees, buildings, totals);
+    employees = buildingInfo.employees;
 
-    return employees.map((employee) => {
-        if(employee.entries.length === 0){
-            return false;
+    let entries = assignEntries(employees, allEntries)
+    employees = entries.employees;
+
+    let removedEmployees = [];
+    let employeeIndexToRemove = leastTimeUsedEmployeeIndex();
+
+    while(employeeIndexToRemove >= 0){
+        console.log("\nNEW CYCLE")
+        let removedEmployee = employees.splice(employeeIndexToRemove,1)[0];
+        removedEmployee = resetEmployee(removedEmployee);
+        removedEmployees.push(removedEmployee);
+
+        employees.forEach((employee) => {
+            employee.entries = []
+            employee.PmTimeLeft = employee.totalPm;
+            employee.NoonTimeLeft = employee.totalNoon;
+            employee.AmTimeLeft = employee.totalAm; 
+        })
+
+        buildingInfo = assignBuilding(employees, buildings, totals)
+        employees = buildingInfo.employees;
+        entries = assignEntries(employees, allEntries);
+        employees = entries.employees;
+        employeeIndexToRemove = leastTimeUsedEmployeeIndex();
+    }
+
+    employees = employees.concat(removedEmployees);
+
+    return {employees, unassignable: entries.unassignable};
+
+    function leastTimeUsedEmployeeIndex(){
+        let minIndex = -1;
+    
+        //I'm using a really big number here to ensure the first total gets recorded
+        let min = 100000;
+    
+        for(let i=0; i<employees.length; i++){
+            const entries = employees[i].entries
+            let total = 0;
+    
+            if(entries.length === 0){
+                return i;
+            }
+    
+            employees[i].entries.forEach((entry) => {
+                total += entry.time
+            });
+    
+            //Only apply index and min change if the employee didn't work 50% of their shift
+            if(total < (employees[i].timeOut - employees[i].timeIn)/2){
+                if(total < min){
+                    minIndex = i;
+                    min = total
+                }
+            }
         }
+        return minIndex
+    }
 
-        const total = employee.entries.reduce((total, entry) => {
-            total + entry.time
-        });
-
-        if(total < (employee.timeOut - employee.timeIn)/2){
-            return false;
-        }
-
-        return true;
-    })
+    function resetEmployee(employee){
+        employee.entries = []
+        employee.PmTimeLeft = 0;
+        employee.NoonTimeLeft = 0;
+        employee.AmTimeLeft = 0;
+        employee.totalAm = 0;
+        employee.totalNoon = 0;
+        employee.totalPm = 0;
+        employee.buildings = new Set();
+    
+        return employee;
+    }
 }
 
 function getBuilding(run) {
@@ -234,7 +260,10 @@ function parseWalkList(file){
         }
 
         try {
-            //Make a separate entry for each time request
+            //Skip over Evening Pkg Play and double on 
+            if(title.includes("Evening Pkg Play")){
+                return
+            }
             if(timeRequest){
                 timeRequest.forEach((timeRequestEntry) => {
                     const entry = new Entry(title, run, name, sex, age, breed, request, out, special, timeRequestEntry.toLowerCase(), time)
@@ -285,18 +314,22 @@ function assignEntries(employees, entries){
         return null
     }
 
-    function sameRunExists(employee, run, name, request){
+    function sameRunExists(employee, {run, name, request, timeRequest}){
         for(let i=0; i<employee.entries.length; i++){
             const entry = employee.entries[i];
 
-            if(entry.run === run && name === entry.name && !request.toLowerCase().includes("alone")){
+            if(entry.run === run && name === entry.name && entry.timeRequest === timeRequest){
+                console.log("Same run exists " + run)
                 return true;
             }
         }
         return false;
     }
 
-    entries.forEach((entry) => {        
+    //Delete me
+    let sameRunCounter = 0;
+
+    entries.forEach((entry, index) => {    
         let startCount = counter
         do {
             let type = null
@@ -307,11 +340,11 @@ function assignEntries(employees, entries){
 
             const building = getBuilding(entry.run)
             if(!building){
-                unassignable.push(entry)
-                return
+                break
             }
 
-            if(sameRunExists(employees[counter], entry.run, entry.name, entry.request)){
+            if(sameRunExists(employees[counter], entry)){
+                sameRunCounter++;
                 increaseCounter()
                 return
             }
@@ -364,7 +397,7 @@ function assignEntries(employees, entries){
                     return
                 }
             }
-            if(!type || type === "noon"){
+            else if(!type || type === "noon"){
                 if(NoonTimeLeft >= entry.time){
                     employees[counter].entries.push(entry)
 
@@ -378,7 +411,7 @@ function assignEntries(employees, entries){
                     return
                 }
             }
-            if(!type || type === "pm"){
+            else if(!type || type === "pm"){
                 if(PmTimeLeft >= entry.time){
                     employees[counter].entries.push(entry)
 
@@ -399,7 +432,8 @@ function assignEntries(employees, entries){
         //This only applies once if none of the employees can take the shift
         unassignable.push(entry)
     })
-
+    
+    console.log("Same run counter: " + sameRunCounter)
     return {employees, unassignable}
 }
 
@@ -469,6 +503,12 @@ function assignBuilding(employees, buildings, buildingTotals){
         if(counter > max){
             counter = 0;
         }
+    }
+
+    if(unassignable.length > 0){
+        buildingInfo.unassignable.forEach((building) => {
+            console.log("Building " + building + " is unassignable")
+        })
     }
 
     return {employees, unassignable}

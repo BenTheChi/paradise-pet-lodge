@@ -6,6 +6,14 @@ const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 const TOKEN_PATH = 'token.json';
 
 module.exports.generateSchedules = async function generateSchedules(title, employees, unassignable){
+
+    let total = unassignable.length
+    console.log("Unassigned: " + total);
+    employees.forEach((employee) => {
+        total += employee.entries.length
+    })
+    console.log("All Sheet Entries Total: " + total);
+
     fs.readFile('credentials.json', (err, content) => {
         if (err) return console.log('Error loading client secret file:', err);
     
@@ -67,13 +75,13 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
             let usedPm = ""
 
             if(employee.totalAm != 0){
-                usedAm = Math.floor(employee.AmTimeLeft/employee.totalAm*100) + "%"
+                usedAm = Math.floor(100 - employee.AmTimeLeft/employee.totalAm*100) + "%"
             }
             if(employee.totalNoon != 0){
-                usedNoon = Math.floor(employee.NoonTimeLeft/employee.totalNoon*100) + "%"
+                usedNoon = Math.floor(100 - employee.NoonTimeLeft/employee.totalNoon*100) + "%"
             }
             if(employee.totalPm != 0){
-                usedPm = Math.floor(employee.PmTimeLeft/employee.totalPm*100) + "%"
+                usedPm = Math.floor(100 - employee.PmTimeLeft/employee.totalPm*100) + "%"
             }
             
             //TODO Check to see how to add formulas
