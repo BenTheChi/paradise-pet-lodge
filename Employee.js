@@ -24,16 +24,19 @@ class Employee{
         this.totalAm = 0;
         this.totalNoon = 0;
         this.totalPm = 0;
+        this.totalTime = 0;
 
         if(this.timeOut > NOON_CUTOFF){
             if(timeIn >= NOON_CUTOFF){
                 this.PmTimeLeft = timeOut - timeIn;
                 this.totalPm = this.PmTimeLeft;
+                this.totalTime += this.totalPm;
                 return
             }
             else{
                 this.PmTimeLeft = timeOut - NOON_CUTOFF;
                 this.totalPm = this.PmTimeLeft;
+                this.totalTime += this.totalPm;
                 timeOut = NOON_CUTOFF;
             }
         }
@@ -41,16 +44,23 @@ class Employee{
             if(timeIn >= AM_CUTOFF){
                 this.NoonTimeLeft = timeOut - timeIn;
                 this.totalNoon = this.NoonTimeLeft;
+                this.totalTime += this.totalNoon;
                 return
             }
             else{
                 this.NoonTimeLeft = timeOut - AM_CUTOFF;
                 this.totalNoon = this.NoonTimeLeft;
+                this.totalTime += this.totalNoon;
                 timeOut = AM_CUTOFF;
             }
         }
         this.AmTimeLeft = timeOut - timeIn;
         this.totalAm = this.AmTimeLeft;
+        this.totalTime += this.totalAm;
+    }
+
+    getPercentageTimeUsed(){
+        return (((this.totalAm - this.AmTimeLeft) + (this.totalPm - this.PmTimeLeft) + (this.totalNoon - this.NoonTimeLeft)) / (this.totalAm + this.totalPm + this.totalNoon)) * 100
     }
 
     formattedTimeIn(){

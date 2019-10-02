@@ -2,16 +2,16 @@
   "name": "paradise-pet-lodge",
   "version": "1.0.0",
   "description": "Tool for parsing and tracking pet lodge data",
-  "bin": "interface.js",
-  "main": "interface.js",
+  "bin": "index.js",
+  "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "pkg": {
     "scripts": "*.js",
-    "assets": "./schedules",
+    "assets": ["./schedules", "./employees"],
     "targets": [
-      "node10"
+      "node10-win"
     ]
   },
   "author": "Ben Chi",
