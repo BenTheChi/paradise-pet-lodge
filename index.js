@@ -7,6 +7,8 @@ const gSheets = require('./gSheets');
 const chalk = require('chalk');
 
 let allEntries = []
+let walkEntries = []
+let playEntries = []
 let anyTimeEntries = []
 let buildings = new Set()
 let totals = new Map()
@@ -24,7 +26,8 @@ else{
     files.forEach((file) => {
         let walkInfo = parseWalkList('schedules/' + file)
 
-        allEntries = allEntries.concat(walkInfo.allEntries)
+        walkEntries = walkEntries.concat(walkInfo.walkEntries)
+        playEntries = playEntries.concat(walkInfo.playEntries)
         anyTimeEntries = anyTimeEntries.concat(walkInfo.anyTimeEntries)
 
         buildings = new Set([...buildings, ...walkInfo.buildings])
@@ -34,9 +37,10 @@ else{
         }
     })
 
-    allEntries.sort((a, b) => (a.run > b.run) ? 1 : -1);
+    walkEntries.sort((a, b) => (a.run > b.run) ? 1 : -1);
+    playEntries.sort((a, b) => (a.run > b.run) ? 1 : -1);    
     anyTimeEntries.sort((a, b) => (a.run > b.run) ? 1 : -1);
-    allEntries = allEntries.concat(anyTimeEntries);
+    allEntries = allEntries.concat(walkEntries, playEntries, anyTimeEntries);
     
     console.log("All Entries Total: " + allEntries.length);
 
@@ -53,30 +57,30 @@ function assignEmployees(allEntries, buildings, totals){
     let entries = assignEntries(employees, allEntries)
     employees = entries.employees;
 
-    let removedEmployees = [];
-    let employeeIndexToRemove = leastTimeUsedEmployeeIndex();
+    // let removedEmployees = [];
+    // let employeeIndexToRemove = leastTimeUsedEmployeeIndex();
 
-    while(employeeIndexToRemove >= 0){
-        console.log("\nNEW CYCLE")
-        let removedEmployee = employees.splice(employeeIndexToRemove,1)[0];
-        removedEmployee = resetEmployee(removedEmployee);
-        removedEmployees.push(removedEmployee);
+    // while(employeeIndexToRemove >= 0){
+    //     console.log("\nNEW CYCLE")
+    //     let removedEmployee = employees.splice(employeeIndexToRemove,1)[0];
+    //     removedEmployee = resetEmployee(removedEmployee);
+    //     removedEmployees.push(removedEmployee);
 
-        employees.forEach((employee) => {
-            employee.entries = []
-            employee.PmTimeLeft = employee.totalPm;
-            employee.NoonTimeLeft = employee.totalNoon;
-            employee.AmTimeLeft = employee.totalAm; 
-        })
+    //     employees.forEach((employee) => {
+    //         employee.entries = []
+    //         employee.PmTimeLeft = employee.totalPm;
+    //         employee.NoonTimeLeft = employee.totalNoon;
+    //         employee.AmTimeLeft = employee.totalAm; 
+    //     })
 
-        buildingInfo = assignBuilding(employees, buildings, totals)
-        employees = buildingInfo.employees;
-        entries = assignEntries(employees, allEntries);
-        employees = entries.employees;
-        employeeIndexToRemove = leastTimeUsedEmployeeIndex();
-    }
+    //     buildingInfo = assignBuilding(employees, buildings, totals)
+    //     employees = buildingInfo.employees;
+    //     entries = assignEntries(employees, allEntries);
+    //     employees = entries.employees;
+    //     employeeIndexToRemove = leastTimeUsedEmployeeIndex();
+    // }
 
-    employees = employees.concat(removedEmployees);
+    // employees = employees.concat(removedEmployees);
 
     return {employees, unassignable: entries.unassignable};
 
@@ -182,6 +186,7 @@ function parseEmployeeList(file){
     for(let i=0; i<employeeDataArray.length; i++){
         if(i%2 === 0){
             let times = employeeDataArray[i].split(' - ');
+            console.log(times)
             employeeTimeIn = timeToNum(times[0]);
             employeeTimeOut = timeToNum(times[1]);
             continue;
@@ -198,11 +203,14 @@ function parseEmployeeList(file){
         employeeTimeOut = 0;
     }
 
+    employees.sort((a, b) => (a.totalTime < b.totalTime) ? 1 : -1);
+
     return employees
 }
 
 function parseWalkList(file){
-    let allEntries = []
+    let walkEntries = []
+    let playEntries = []
     let anyTimeEntries = []
     const buildings = new Set()
     const totals = new Map()
@@ -215,7 +223,16 @@ function parseWalkList(file){
             return null
         }
 
-        return request.match(/((1[0-2])|[1-9])?(pm|am)/g)
+        request = request + " "
+        const timeRequest = request.match(/((1[0-2])|[1-9])?(pm |am |noon )/g)
+        
+        if(timeRequest){
+            for(let i=0; i<timeRequest.length; i++){
+                timeRequest[i] = timeRequest[i].trim()
+            }
+        }
+
+        return timeRequest
     }
 
     //Save the date title from the first line
@@ -242,7 +259,7 @@ function parseWalkList(file){
         const timeRequest = getTimeRequest(request);
         const special = "";
 
-        if(title.includes("Play")){
+        if(title.includes("Play") || title.includes("Ply")){
             time = .5;
         }
 
@@ -266,7 +283,13 @@ function parseWalkList(file){
             if(timeRequest){
                 timeRequest.forEach((timeRequestEntry) => {
                     const entry = new Entry(title, run, name, sex, age, breed, request, out, special, timeRequestEntry.toLowerCase(), time)
-                    allEntries.push(entry)
+
+                    if(time === .25){
+                        walkEntries.push(entry)
+                    }
+                    else{
+                        playEntries.push(entry)
+                    }
                 })
             }
             else{
@@ -278,7 +301,7 @@ function parseWalkList(file){
         }
     })
 
-    return {allEntries, anyTimeEntries, buildings, totals, dateTitle};
+    return {walkEntries, playEntries, anyTimeEntries, buildings, totals, dateTitle};
 }
 
 function assignEntries(employees, entries){
@@ -290,6 +313,13 @@ function assignEntries(employees, entries){
         counter++
         if(counter > max){
             counter = 0
+        }
+    }
+
+    function decreaseCounter(){
+        counter--
+        if(counter < 0){
+            counter = max
         }
     }
 
@@ -313,12 +343,11 @@ function assignEntries(employees, entries){
         return null
     }
 
-    function sameRunExists(employee, {run, name, request, timeRequest}){
-        for(let i=0; i<employee.entries.length; i++){
+    function sameRunExists(employee, {run, title, timeRequest}){
+        for(let i=employee.entries.length-1; i>=0; i--){
             const entry = employee.entries[i];
 
-            if(entry.run === run && name === entry.name && entry.timeRequest === timeRequest){
-                console.log("Same run exists " + run)
+            if(entry.run === run && entry.title === title && entry.timeRequest === timeRequest){
                 return true;
             }
         }
@@ -342,11 +371,24 @@ function assignEntries(employees, entries){
                 break
             }
 
-            if(sameRunExists(employees[counter], entry)){
-                sameRunCounter++;
-                increaseCounter()
-                return
+            let prevCounter = counter - 1;
+            if(prevCounter < 0){
+                prevCounter = max;
             }
+
+            if(sameRunExists(employees[prevCounter], entry)){
+                if(!entry.request.toLowerCase().includes("alone")){
+                    console.log(employees[prevCounter].name)
+                    console.log("Adding entry " + entry.run)
+
+                    employees[prevCounter].entries.push(entry)
+                    return
+                }
+
+                increaseCounter()
+                continue
+            }
+
             if(AmTimeLeft <= 0 && PmTimeLeft <= 0 && NoonTimeLeft <= 0){
                 increaseCounter()
                 continue
@@ -372,13 +414,13 @@ function assignEntries(employees, entries){
             else if(!entry.timeRequest){
                 type = null;
             }
-            else if(entry.timeRequest.includes("am")){
+            else if(entry.timeRequest.toLowerCase().includes("am")){
                 type = "am";
             }
-            else if(entry.timeRequest.includes("pm")){
+            else if(entry.timeRequest.toLowerCase().includes("pm")){
                 type = "pm";
             }
-            else if(entry.timeRequest.includes("noon")){
+            else if(entry.timeRequest.toLowerCase().includes("noon")){
                 type = "noon";
             }
 
@@ -396,7 +438,7 @@ function assignEntries(employees, entries){
                     return
                 }
             }
-            else if(!type || type === "noon"){
+            if(!type || type === "noon"){
                 if(NoonTimeLeft >= entry.time){
                     employees[counter].entries.push(entry)
 
@@ -410,7 +452,7 @@ function assignEntries(employees, entries){
                     return
                 }
             }
-            else if(!type || type === "pm"){
+            if(!type || type === "pm"){
                 if(PmTimeLeft >= entry.time){
                     employees[counter].entries.push(entry)
 

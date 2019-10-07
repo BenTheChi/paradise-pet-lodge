@@ -11,7 +11,7 @@
     "scripts": "*.js",
     "assets": ["./schedules", "./employees"],
     "targets": [
-      "node10"
+      "node10-win"
     ]
   },
   "author": "Ben Chi",

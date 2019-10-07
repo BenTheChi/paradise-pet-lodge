@@ -59,20 +59,21 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
 
     //Creates a multi dimensional array representing the entries
     function createSheetArray(entries){
-        let finalArray = [['TYPE', 'RUN', 'PET NAME', 'BREED', 'AGE', 'SEX', 'OUT TIME', 'TIME', 'REQUEST', 'INITIALS']]
+        let finalArray = [['TYPE', 'RUN', 'PET NAME', 'BREED', 'AGE', 'SEX', 'OUT TIME', 'LENGTH', 'REQUEST', 'INITIALS', 'TIME']]
         entries.forEach((entry) => {
-            finalArray.push([entry.title, entry.run, entry.name, entry.breed, entry.age, entry.sex, entry.timeRequest, entry.time*60+" min", entry.request, ""])
+            finalArray.push([entry.title, entry.run, entry.name, entry.breed, entry.age, entry.sex, entry.timeRequest, entry.time*60+" min", entry.request, "", ""])
         })
 
         return finalArray
     }
 
     function createEmployeeArray(employees){
-        let finalArray = [['NAME', 'BUILDINGS', 'TIME IN', 'TIME OUT', 'AM USED', 'NOON USED', 'PM USED']]
+        let finalArray = [['NAME', 'BUILDINGS', 'TIME IN', 'TIME OUT', 'AM USED', 'NOON USED', 'PM USED', 'TOTAL USED']]
         employees.forEach((employee) => {
             let usedAm = ""
             let usedNoon = ""
             let usedPm = ""
+            let usedTotal = ""
 
             if(employee.totalAm != 0){
                 usedAm = Math.floor(100 - employee.AmTimeLeft/employee.totalAm*100) + "%"
@@ -83,9 +84,12 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
             if(employee.totalPm != 0){
                 usedPm = Math.floor(100 - employee.PmTimeLeft/employee.totalPm*100) + "%"
             }
+            if(employee.usedTotal != 0){
+                usedTotal = Math.floor(employee.getPercentageTimeUsed()) + "%"
+            }
             
             //TODO Check to see how to add formulas
-            finalArray.push([employee.name, Array.from(employee.buildings).join(', '), employee.formattedTimeIn(), employee.formattedTimeOut(), usedAm, usedNoon, usedPm])
+            finalArray.push([employee.name, Array.from(employee.buildings).join(', '), employee.formattedTimeIn(), employee.formattedTimeOut(), usedAm, usedNoon, usedPm, usedTotal])
         })
         return finalArray;
     }
