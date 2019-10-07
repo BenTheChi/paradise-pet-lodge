@@ -4,7 +4,6 @@ const path = require('path');
 const Entry = require('./Entry').Entry;
 const Employee = require('./Employee').Employee;
 const gSheets = require('./gSheets');
-
 const chalk = require('chalk');
 
 let allEntries = []
@@ -191,7 +190,7 @@ function parseEmployeeList(file){
         //Only take the name.  Ignore total time.
         employeeName = employeeDataArray[i].split(',')[1];
 
-        employees.push(new Employee(employeeName, employeeTimeIn, employeeTimeOut))
+        employees.push(new Employee(employeeName, employeeTimeIn, employeeTimeOut));
 
         //Reset employee entry
         employeeName = "";
