@@ -68,9 +68,11 @@ else{
 
         await gSheets.generateSchedules(dateTitle, employeeEntries.employees, employeeEntries.unassignable)
         console.log(chalk.green("Schedules created successfully!"))
-        await fs.copy('employees', `employees_archive/Employee ${dateTitle}`)
+        console.log(chalk.green("Moving employee files to archive"))
+        await fs.copy('employees', `employees_archive/Employees ${dateTitle.replace("Schedule for ", "")}`)
         await fs.emptyDir('employees')
-        await fs.copy('schedules', `schedules_archive/Activity ${dateTitle}`)
+        console.log(chalk.green("Moving activity files to archive"))
+        await fs.copy('schedules', `schedules_archive/Activities ${dateTitle.replace("Schedule for ", "")}`)
         await fs.emptyDir('schedules')
     })()
     .catch((error) => {
