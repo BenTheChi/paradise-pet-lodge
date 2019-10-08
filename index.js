@@ -1,5 +1,5 @@
 "use strict";
-const fs = require('fs');
+const fs = require('fs-extra');
 const path = require('path');
 const Entry = require('./Entry').Entry;
 const Employee = require('./Employee').Employee;
@@ -25,13 +25,13 @@ const files = fs.readdirSync(directoryPath)
 
 if(!files){
     console.log(chalk.red('Unable to load from activities folder'));
-    rl.setPrompt("Press any button to close this window\n\n");
+    rl.setPrompt("Press 'Enter' button to close this window\n\n");
     rl.prompt();
     rl.on('line', () => rl.close());
 }
 else if(files.length === 0){
     console.log(chalk.red('There are no activity schedules'));
-    rl.setPrompt("Press any button to close this window\n\n");
+    rl.setPrompt("Press 'Enter' button to close this window\n\n");
     rl.prompt();
     rl.on('line', () => rl.close());
 }
@@ -51,7 +51,7 @@ else{
             buildings = new Set([...buildings, ...walkInfo.buildings])
             totals = mergeTotals(totals, walkInfo.totals)
             if(!dateTitle){
-                dateTitle = walkInfo.dateTitle;
+                dateTitle = walkInfo.dateTitle.trim();
             }
         })
     
@@ -68,12 +68,16 @@ else{
 
         await gSheets.generateSchedules(dateTitle, employeeEntries.employees, employeeEntries.unassignable)
         console.log(chalk.green("Schedules created successfully!"))
+        await fs.copy('employees', `employees_archive/Employee ${dateTitle}`)
+        await fs.emptyDir('employees')
+        await fs.copy('schedules', `schedules_archive/Activity ${dateTitle}`)
+        await fs.emptyDir('schedules')
     })()
     .catch((error) => {
         console.log(chalk.red(error))
     })
     .finally(() => {
-        rl.setPrompt("Press any button to close this window\n\n");
+        rl.setPrompt("Press 'Enter' button to close this window\n\n");
         rl.prompt();
         rl.on('line', () => rl.close());
     })

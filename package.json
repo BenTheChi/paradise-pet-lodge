@@ -9,7 +9,12 @@
   },
   "pkg": {
     "scripts": "*.js",
-    "assets": ["./schedules", "./employees"],
+    "assets": [
+      "./schedules",
+      "./employees",
+      "./schedules_archive",
+      "./employees_archive"
+    ],
     "targets": [
       "node10-win"
     ]
@@ -18,6 +23,7 @@
   "license": "ISC",
   "dependencies": {
     "chalk": "^2.4.2",
+    "fs-extra": "^8.1.0",
     "googleapis": "^43.0.0"
   }
 }
