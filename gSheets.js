@@ -1,6 +1,7 @@
 "use strict"
 const {google} = require('googleapis');
 const readline = require('readline');
+const chalk = require('chalk');
 const fs = require('fs');
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 const TOKEN_PATH = 'token.json';
@@ -8,11 +9,13 @@ const TOKEN_PATH = 'token.json';
 module.exports.generateSchedules = async function generateSchedules(title, employees, unassignable){
 
     let total = unassignable.length
-    console.log("Unassigned: " + total);
     employees.forEach((employee) => {
         total += employee.entries.length
     })
-    console.log("All Sheet Entries Total: " + total);
+    if(total === 0){
+        throw new Error("There are no entries!")
+    }
+    console.log(chalk.blue("All Sheet Entries Total: " + total));
 
     fs.readFile('credentials.json', (err, content) => {
         if (err) return console.log('Error loading client secret file:', err);
@@ -61,19 +64,20 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
     function createSheetArray(entries){
         let finalArray = [['TYPE', 'RUN', 'PET NAME', 'BREED', 'AGE', 'SEX', 'OUT TIME', 'LENGTH', 'REQUEST', 'INITIALS', 'TIME']]
         entries.forEach((entry) => {
-            finalArray.push([entry.title, entry.run, entry.name, entry.breed, entry.age, entry.sex, entry.timeRequest, entry.time*60+" min", entry.request, "", ""])
+            finalArray.push([entry.title, entry.run, entry.name, entry.breed, entry.age, entry.sex, entry.timeRequest, entry.time*60, entry.request, "", ""])
         })
 
         return finalArray
     }
 
     function createEmployeeArray(employees){
-        let finalArray = [['NAME', 'BUILDINGS', 'TIME IN', 'TIME OUT', 'AM USED', 'NOON USED', 'PM USED', 'TOTAL USED']]
-        employees.forEach((employee) => {
+        let finalArray = [['NAME', 'BUILDINGS', 'TIME IN', 'TIME OUT', 'TOTAL TIME', 'PERCENT USED', 'AM USED', 'NOON USED', 'PM USED']]
+        employees.forEach((employee, index) => {
             let usedAm = ""
             let usedNoon = ""
             let usedPm = ""
             let usedTotal = ""
+            let total = `=D${index+2}-C${index+2}`
 
             if(employee.totalAm != 0){
                 usedAm = Math.floor(100 - employee.AmTimeLeft/employee.totalAm*100) + "%"
@@ -85,11 +89,11 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
                 usedPm = Math.floor(100 - employee.PmTimeLeft/employee.totalPm*100) + "%"
             }
             if(employee.usedTotal != 0){
-                usedTotal = Math.floor(employee.getPercentageTimeUsed()) + "%"
+                usedTotal = `=TO_PERCENT(SUM('${employee.name}'!H2:H1000)/(Hour(E${index+2})*60+MINUTE(E${index+2})))`
             }
             
             //TODO Check to see how to add formulas
-            finalArray.push([employee.name, Array.from(employee.buildings).join(', '), employee.formattedTimeIn(), employee.formattedTimeOut(), usedAm, usedNoon, usedPm, usedTotal])
+            finalArray.push([employee.name, Array.from(employee.buildings).join(', '), employee.formattedTimeIn(), employee.formattedTimeOut(), total, usedTotal, usedAm, usedNoon, usedPm])
         })
         return finalArray;
     }
@@ -198,6 +202,26 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
                           },
                           fields: 'userEnteredFormat(numberFormat)'
                         }
+                    },
+                    {
+                        repeatCell: {
+                          range: {
+                            sheetId: sheet.properties.sheetId,
+                            startRowIndex: 1,
+                            endRowIndex: 100,
+                            startColumnIndex: 4,
+                            endColumnIndex: 5
+                          },
+                          cell: {
+                            userEnteredFormat: {
+                              numberFormat: {
+                                type: "DATE_TIME",
+                                pattern: `hh:mm:ss`
+                              }
+                            }
+                          },
+                          fields: 'userEnteredFormat(numberFormat)'
+                        }
                     })
                 }
                 else{
@@ -233,7 +257,7 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
             await Promise.all(promises);
         }
         catch(error){
-            console.log(error)
+            throw new Error(error)
         }
     }
 
@@ -243,10 +267,10 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
         const spreadsheet = await createSheets(gsapi);
 
         if(spreadsheet.data){
-            const data = await writeToSheets(gsapi, spreadsheet.data.sheets, spreadsheet.data.spreadsheetId);
+            await writeToSheets(gsapi, spreadsheet.data.sheets, spreadsheet.data.spreadsheetId);
         }
         else{
-            console.log("Error creating spreadsheet")
+            throw new Error("Error creating spreadsheet!")
             return
         }
     }

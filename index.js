@@ -1,10 +1,16 @@
-"use strict"
+"use strict";
 const fs = require('fs');
 const path = require('path');
 const Entry = require('./Entry').Entry;
 const Employee = require('./Employee').Employee;
 const gSheets = require('./gSheets');
 const chalk = require('chalk');
+const readline = require('readline');
+
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
 
 let allEntries = []
 let walkEntries = []
@@ -18,36 +24,61 @@ const directoryPath = path.join(process.cwd(),'schedules')
 const files = fs.readdirSync(directoryPath)
 
 if(!files){
-    console.log('Unable to scan directory: ' + err);
+    console.log(chalk.red('Unable to load from activities folder'));
+    rl.setPrompt("Press any button to close this window\n\n");
+    rl.prompt();
+    rl.on('line', () => rl.close());
+}
+else if(files.length === 0){
+    console.log(chalk.red('There are no activity schedules'));
+    rl.setPrompt("Press any button to close this window\n\n");
+    rl.prompt();
+    rl.on('line', () => rl.close());
 }
 else{
-    let dateTitle = null;
+
+    (async () => {
+        let dateTitle = null;
     
-    files.forEach((file) => {
-        let walkInfo = parseWalkList('schedules/' + file)
+        files.forEach((file) => {
+            let walkInfo = parseWalkList('schedules/' + file)
+            const entryTotal = walkInfo.walkEntries.length + walkInfo.playEntries.length + walkInfo.anyTimeEntries.length
+            console.log(chalk.blue(file + " total entries: " + entryTotal))
+            walkEntries = walkEntries.concat(walkInfo.walkEntries)
+            playEntries = playEntries.concat(walkInfo.playEntries)
+            anyTimeEntries = anyTimeEntries.concat(walkInfo.anyTimeEntries)
+    
+            buildings = new Set([...buildings, ...walkInfo.buildings])
+            totals = mergeTotals(totals, walkInfo.totals)
+            if(!dateTitle){
+                dateTitle = walkInfo.dateTitle;
+            }
+        })
+    
+        walkEntries.sort((a, b) => (a.run > b.run) ? 1 : -1);
+        playEntries.sort((a, b) => (a.run > b.run) ? 1 : -1);
+        anyTimeEntries.sort((a, b) => (a.run > b.run) ? 1 : -1);
+        allEntries = allEntries.concat(walkEntries, playEntries, anyTimeEntries);
+        
+        console.log(chalk.blue("All Entries Total: " + allEntries.length));
+    
+        const employeeEntries = assignEmployees(allEntries, buildings, totals);
+        console.log(chalk.blue("Unassigned Entries Total: " + employeeEntries.unassignable.length));
+        console.log(chalk.green("Creating Google spreadsheet " + dateTitle));
 
-        walkEntries = walkEntries.concat(walkInfo.walkEntries)
-        playEntries = playEntries.concat(walkInfo.playEntries)
-        anyTimeEntries = anyTimeEntries.concat(walkInfo.anyTimeEntries)
-
-        buildings = new Set([...buildings, ...walkInfo.buildings])
-        totals = mergeTotals(totals, walkInfo.totals)
-        if(!dateTitle){
-            dateTitle = walkInfo.dateTitle;
-        }
+        await gSheets.generateSchedules(dateTitle, employeeEntries.employees, employeeEntries.unassignable)
+        console.log(chalk.green("Schedules created successfully!"))
+    })()
+    .catch((error) => {
+        console.log(chalk.red(error))
     })
-
-    walkEntries.sort((a, b) => (a.run > b.run) ? 1 : -1);
-    playEntries.sort((a, b) => (a.run > b.run) ? 1 : -1);    
-    anyTimeEntries.sort((a, b) => (a.run > b.run) ? 1 : -1);
-    allEntries = allEntries.concat(walkEntries, playEntries, anyTimeEntries);
-    
-    console.log("All Entries Total: " + allEntries.length);
-
-    const employeeEntries = assignEmployees(allEntries, buildings, totals);
-
-    gSheets.generateSchedules(dateTitle, employeeEntries.employees, employeeEntries.unassignable);
+    .finally(() => {
+        rl.setPrompt("Press any button to close this window\n\n");
+        rl.prompt();
+        rl.on('line', () => rl.close());
+    })
 }
+
 
 function assignEmployees(allEntries, buildings, totals){
     let employees = parseEmployeeList('employees/Export_Schedule_Print.csv');
@@ -57,79 +88,12 @@ function assignEmployees(allEntries, buildings, totals){
     let entries = assignEntries(employees, allEntries)
     employees = entries.employees;
 
-    // let removedEmployees = [];
-    // let employeeIndexToRemove = leastTimeUsedEmployeeIndex();
-
-    // while(employeeIndexToRemove >= 0){
-    //     console.log("\nNEW CYCLE")
-    //     let removedEmployee = employees.splice(employeeIndexToRemove,1)[0];
-    //     removedEmployee = resetEmployee(removedEmployee);
-    //     removedEmployees.push(removedEmployee);
-
-    //     employees.forEach((employee) => {
-    //         employee.entries = []
-    //         employee.PmTimeLeft = employee.totalPm;
-    //         employee.NoonTimeLeft = employee.totalNoon;
-    //         employee.AmTimeLeft = employee.totalAm; 
-    //     })
-
-    //     buildingInfo = assignBuilding(employees, buildings, totals)
-    //     employees = buildingInfo.employees;
-    //     entries = assignEntries(employees, allEntries);
-    //     employees = entries.employees;
-    //     employeeIndexToRemove = leastTimeUsedEmployeeIndex();
-    // }
-
-    // employees = employees.concat(removedEmployees);
-
     return {employees, unassignable: entries.unassignable};
-
-    function leastTimeUsedEmployeeIndex(){
-        let minIndex = -1;
-    
-        //I'm using a really big number here to ensure the first total gets recorded
-        let min = 100000;
-    
-        for(let i=0; i<employees.length; i++){
-            const entries = employees[i].entries
-            let total = 0;
-    
-            if(entries.length === 0){
-                return i;
-            }
-    
-            employees[i].entries.forEach((entry) => {
-                total += entry.time
-            });
-    
-            //Only apply index and min change if the employee didn't work 50% of their shift
-            if(total < (employees[i].timeOut - employees[i].timeIn)/2){
-                if(total < min){
-                    minIndex = i;
-                    min = total
-                }
-            }
-        }
-        return minIndex
-    }
-
-    function resetEmployee(employee){
-        employee.entries = []
-        employee.PmTimeLeft = 0;
-        employee.NoonTimeLeft = 0;
-        employee.AmTimeLeft = 0;
-        employee.totalAm = 0;
-        employee.totalNoon = 0;
-        employee.totalPm = 0;
-        employee.buildings = new Set();
-    
-        return employee;
-    }
 }
 
 function getBuilding(run) {
     if(!run){
-        console.log(chalk.red("THERE IS AN EMPTY RUN!\n"))
+        console.log(chalk.red("EMPTY RUN DETECTED!"))
         return null
     }
 
@@ -163,6 +127,10 @@ function parseEmployeeList(file){
     let employeeTimeOut = 0;
     let employees = [];
 
+    if(!employeeData){
+        throw new Error("Cannot read employee schedules file")
+    }
+
     function timeToNum(timeString){
         const timeArray = timeString.split(":");
         let hour = parseFloat(timeArray[0]);
@@ -185,8 +153,12 @@ function parseEmployeeList(file){
     
     for(let i=0; i<employeeDataArray.length; i++){
         if(i%2 === 0){
+            let regex = RegExp('\\d{1,2}:\\d{1,2}(am|pm) - \\d{1,2}:\\d{1,2}(am|pm)')
+            if(!regex.test(employeeDataArray[i])){
+                throw new Error("Invalid employee time entry #" + (i + 1))
+            }
+
             let times = employeeDataArray[i].split(' - ');
-            console.log(times)
             employeeTimeIn = timeToNum(times[0]);
             employeeTimeOut = timeToNum(times[1]);
             continue;
@@ -194,6 +166,9 @@ function parseEmployeeList(file){
 
         //Only take the name.  Ignore total time.
         employeeName = employeeDataArray[i].split(',')[1];
+        if(!employeeName){
+            throw new Error("Employee name entries cannot be blank")
+        }
 
         employees.push(new Employee(employeeName, employeeTimeIn, employeeTimeOut));
 
@@ -201,6 +176,10 @@ function parseEmployeeList(file){
         employeeName = "";
         employeeTimeIn = 0;
         employeeTimeOut = 0;
+    }
+
+    if(!employees.length === 0){
+        throw new Error("There are no employee schedules")
     }
 
     employees.sort((a, b) => (a.totalTime < b.totalTime) ? 1 : -1);
@@ -276,7 +255,7 @@ function parseWalkList(file){
         }
 
         try {
-            //Skip over Evening Pkg Play and double on 
+            //Skip over Evening Pkg Play and double on the others
             if(title.includes("Evening Pkg Play")){
                 return
             }
@@ -354,9 +333,6 @@ function assignEntries(employees, entries){
         return false;
     }
 
-    //Delete me
-    let sameRunCounter = 0;
-
     entries.forEach((entry, index) => {    
         let startCount = counter
         do {
@@ -378,9 +354,6 @@ function assignEntries(employees, entries){
 
             if(sameRunExists(employees[prevCounter], entry)){
                 if(!entry.request.toLowerCase().includes("alone")){
-                    console.log(employees[prevCounter].name)
-                    console.log("Adding entry " + entry.run)
-
                     employees[prevCounter].entries.push(entry)
                     return
                 }
@@ -474,7 +447,6 @@ function assignEntries(employees, entries){
         unassignable.push(entry)
     })
     
-    console.log("Same run counter: " + sameRunCounter)
     return {employees, unassignable}
 }
 
