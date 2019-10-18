@@ -71,7 +71,7 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
     }
 
     function createEmployeeArray(employees){
-        let finalArray = [['NAME', 'BUILDINGS', 'TIME IN', 'TIME OUT', 'TOTAL TIME', 'PERCENT USED', 'AM USED', 'NOON USED', 'PM USED']]
+        let finalArray = [['NAME', 'BUILDINGS', 'TIME IN', 'TIME OUT', 'TOTAL TIME', 'TIME USED', 'AM USED', 'NOON USED', 'PM USED']]
         employees.forEach((employee, index) => {
             let usedAm = ""
             let usedNoon = ""
@@ -89,7 +89,7 @@ module.exports.generateSchedules = async function generateSchedules(title, emplo
                 usedPm = Math.floor(100 - employee.PmTimeLeft/employee.totalPm*100) + "%"
             }
             if(employee.usedTotal != 0){
-                usedTotal = `=TO_PERCENT(SUM('${employee.name}'!H2:H1000)/(Hour(E${index+2})*60+MINUTE(E${index+2})))`
+                usedTotal = `=TIME(0, SUM('${employee.name}'!H2:H1000), 0)`
             }
             
             //TODO Check to see how to add formulas
