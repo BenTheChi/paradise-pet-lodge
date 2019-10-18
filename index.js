@@ -61,19 +61,18 @@ else{
         allEntries = allEntries.concat(walkEntries, playEntries, anyTimeEntries);
         
         console.log(chalk.blue("All Entries Total: " + allEntries.length));
-    
         const employeeEntries = assignEmployees(allEntries, buildings, totals);
         console.log(chalk.blue("Unassigned Entries Total: " + employeeEntries.unassignable.length));
         console.log(chalk.green("Creating Google spreadsheet " + dateTitle));
 
         await gSheets.generateSchedules(dateTitle, employeeEntries.employees, employeeEntries.unassignable)
         console.log(chalk.green("Schedules created successfully!"))
-        console.log(chalk.green("Moving employee files to archive"))
-        await fs.copy('employees', `employees_archive/Employees ${dateTitle.replace("Schedule for ", "")}`)
-        await fs.emptyDir('employees')
-        console.log(chalk.green("Moving activity files to archive"))
-        await fs.copy('schedules', `schedules_archive/Activities ${dateTitle.replace("Schedule for ", "")}`)
-        await fs.emptyDir('schedules')
+        // console.log(chalk.green("Moving employee files to archive"))
+        // await fs.copy('employees', `employees_archive/Employees ${dateTitle.replace("Schedule for ", "")}`)
+        // await fs.emptyDir('employees')
+        // console.log(chalk.green("Moving activity files to archive"))
+        // await fs.copy('schedules', `schedules_archive/Activities ${dateTitle.replace("Schedule for ", "")}`)
+        // await fs.emptyDir('schedules')
     })()
     .catch((error) => {
         console.log(chalk.red(error))
@@ -374,7 +373,7 @@ function assignEntries(employees, entries){
                 continue
             }
             if(!employees[counter].buildings.has(building)){
-                if(employees[counter].buildings.size === 2){
+                if(employees[counter].buildings.size === 1){
                     increaseCounter()
                     continue
                 }
@@ -512,12 +511,16 @@ function assignBuilding(employees, buildings, buildingTotals){
         return sortedCombinations
     }
     
-    let combinations = findCombinations()
+    // let combinations = findCombinations()
+    // let max = combinations.length - 1;
+    let buildingSets = availableBuildings.map((building) => {
+        return new Set(building)
+    })
     let counter = 0;
-    let max = combinations.length - 1;
+    let max = buildingSets.length-1;
     
     for(let i=0; i<employees.length; i++){
-        employees[i].buildings = combinations[counter];
+        employees[i].buildings = buildingSets[counter];
 
         counter++
         if(counter > max){
