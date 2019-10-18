@@ -142,7 +142,7 @@ function parseEmployeeList(file){
         let hour = parseFloat(timeArray[0]);
 
         if(timeArray[1].includes("pm")){
-            hour += 12; 
+            hour += 12;
         }
 
         const minute = parseFloat(timeArray[1].replace(/am|pm/, ""))/60
@@ -360,6 +360,7 @@ function assignEntries(employees, entries){
 
             if(sameRunExists(employees[prevCounter], entry)){
                 if(!entry.request.toLowerCase().includes("alone")){
+                    entry.time = 0;  //Do not include duplicate entry times
                     employees[prevCounter].entries.push(entry)
                     return
                 }
